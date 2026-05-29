@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Copy, Pencil, Plus } from "lucide-react";
 import { PriceDisplay } from "@/components/landlord/price-display";
 import { StatusBadge } from "@/components/landlord/status-badge";
-import { CopyLinkButton } from "@/components/share/copy-link-button";
 import { CopyTextButton } from "@/components/share/copy-text-button";
 import { getSiteUrl } from "@/lib/env";
 import { feeRows, formatArea, formatCurrencyVnd, formatDate } from "@/lib/landlord/format";
@@ -53,18 +52,18 @@ export default async function RoomDetailPage({ params, searchParams }: PageProps
   return (
     <div className="space-y-5">
       {(query.created || query.updated) ? (
-        <div className="rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+        <div className="rounded-md border border-[#A7F3D0] bg-[#ECFDF5] p-4 text-sm text-[#047857]">
           {query.created ? "Đã tạo phòng thành công." : "Đã lưu phòng thành công."}
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-700 px-3 font-semibold text-white" href={`/landlord/buildings/${room.building.id}/rooms/new`}>
+            <Link className="inline-flex h-10 items-center gap-2 rounded-md bg-[#0F5FD7] px-3 font-semibold text-white" href={`/landlord/buildings/${room.building.id}/rooms/new`}>
               <Plus className="size-4" aria-hidden />
               Thêm phòng khác
             </Link>
-            <Link className="inline-flex h-10 items-center gap-2 rounded-md border border-green-300 bg-white px-3 font-semibold text-green-800" href={`/landlord/rooms/${room.id}/duplicate`}>
+            <Link className="inline-flex h-10 items-center gap-2 rounded-md border border-[#A7F3D0] bg-white px-3 font-semibold text-[#047857] hover:bg-[#ECFDF5]" href={`/landlord/rooms/${room.id}/duplicate`}>
               <Copy className="size-4" aria-hidden />
               Sao chép phòng này
             </Link>
-            <Link className="inline-flex h-10 items-center rounded-md border border-green-300 bg-white px-3 font-semibold text-green-800" href={`/landlord/buildings/${room.building.id}`}>
+            <Link className="inline-flex h-10 items-center rounded-md border border-[#A7F3D0] bg-white px-3 font-semibold text-[#047857] hover:bg-[#ECFDF5]" href={`/landlord/buildings/${room.building.id}`}>
               Quay lại danh sách phòng
             </Link>
           </div>
@@ -73,7 +72,6 @@ export default async function RoomDetailPage({ params, searchParams }: PageProps
 
       <div className="flex flex-wrap gap-2">
         <CopyTextButton label="Copy tin phòng" text={shareText} />
-        <CopyLinkButton label="Copy link phòng" path={`/r/${room.public_slug}`} />
         <Link
           className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
           href={`/landlord/buildings/${room.building.id}`}
@@ -82,7 +80,7 @@ export default async function RoomDetailPage({ params, searchParams }: PageProps
           Quay lại căn nhà
         </Link>
         <Link
-          className="inline-flex h-11 items-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"
+          className="inline-flex h-11 items-center gap-2 rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
           href={`/landlord/rooms/${room.id}/edit`}
         >
           <Pencil className="size-4" aria-hidden />

@@ -48,13 +48,13 @@ export function BrokerSavedWatchlist({ rooms }: BrokerSavedWatchlistProps) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Bookmark className="size-4 text-teal-700" aria-hidden />
+              <Bookmark className="size-4 text-[#0F5FD7]" aria-hidden />
               <h2 className="text-base font-bold text-slate-950">Phòng theo dõi</h2>
             </div>
             <p className="mt-1 text-sm text-slate-500">Các phòng bạn đang theo dõi.</p>
           </div>
           <Link
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
             href="/broker/saved"
           >
             Mở phòng theo dõi
@@ -76,7 +76,7 @@ export function BrokerSavedWatchlist({ rooms }: BrokerSavedWatchlistProps) {
         <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 text-center">
           <p className="font-semibold text-slate-950">Bạn chưa theo dõi phòng nào.</p>
           <Link
-            className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-[#0F5FD7] px-4 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
             href="/broker/rooms"
           >
             Mở kho phòng
@@ -102,7 +102,7 @@ export function BrokerSavedWatchlist({ rooms }: BrokerSavedWatchlistProps) {
               </p>
               <div className="mt-3 flex items-center justify-between gap-3">
                 {room.commission ? (
-                  <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">
+                  <span className="rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1 text-xs font-semibold text-[#0F5FD7]">
                     HH {room.commission}
                   </span>
                 ) : (

@@ -19,10 +19,10 @@ export default async function PublicPackagePage({ params }: PublicPackagePagePro
   }
 
   return (
-    <main className="min-h-screen bg-[#f7faf8]">
+    <main className="min-h-screen bg-[#F8FAFC]">
       <section className="bg-white">
         <div className="mx-auto max-w-5xl px-4 pb-6 pt-8 sm:pt-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-teal-100 bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1 text-xs font-bold text-[#0B3B82]">
             <ShieldCheck className="size-3.5" aria-hidden />
             Link phòng đã lọc sẵn
           </div>
@@ -35,7 +35,7 @@ export default async function PublicPackagePage({ params }: PublicPackagePagePro
             Môi giới đã chọn sẵn một số phòng theo nhu cầu của bạn. Xem ảnh, giá và tiện ích trước khi hẹn lịch đi xem thực tế.
           </p>
           {data.customer_need ? (
-            <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="mt-5 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Nhu cầu</p>
               <p className="mt-1 text-sm leading-6 text-slate-700">{data.customer_need}</p>
             </div>
@@ -55,7 +55,7 @@ export default async function PublicPackagePage({ params }: PublicPackagePagePro
       </section>
 
       <footer className="mx-auto max-w-5xl px-4 pb-10 pt-2">
-        <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-500">
+        <p className="rounded-2xl border border-[#E2E8F0] bg-white p-4 text-sm leading-6 text-[#64748B]">
           Thông tin phòng có thể thay đổi theo tình trạng thực tế. Vui lòng liên hệ môi giới để xác nhận trước khi đi xem phòng.
         </p>
       </footer>
@@ -84,7 +84,7 @@ function PublicRoomCard({
   ].filter(Boolean).join("\n");
 
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <article className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm transition-shadow hover:shadow-md">
       <div className="relative bg-slate-100">
         {primaryImage ? (
           <img
@@ -136,7 +136,7 @@ function PublicRoomCard({
             <div className="mt-4 flex flex-wrap gap-2">
               {features.map((feature) => (
                 <span
-                  className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800"
+                  className="rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1 text-xs font-bold text-[#0B3B82]"
                   key={feature}
                 >
                   {feature}
@@ -156,7 +156,7 @@ function PublicRoomCard({
           <InterestCopyButton packageSlug={packageSlug} roomId={room.id} text={interestText} />
           {driveUrl ? (
             <a
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#BFDBFE] bg-white px-4 text-sm font-bold text-[#0F5FD7] hover:bg-[#EFF6FF]"
               href={driveUrl}
               rel="noreferrer"
               target="_blank"
@@ -177,7 +177,7 @@ function PublicRoomCard({
 
 function InfoBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 p-3">
+    <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
       <p className="text-xs font-semibold text-slate-500">{label}</p>
       <p className="mt-1 text-sm font-black text-slate-950">{value}</p>
     </div>

@@ -53,13 +53,13 @@ export function BuildingFeesForm({ buildingId, fees }: BuildingFeesFormProps) {
         </div>
       ) : null}
       {state.message ? (
-        <div className="mt-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+        <div className="mt-4 rounded-md border border-[#A7F3D0] bg-[#ECFDF5] px-3 py-2 text-sm text-[#047857]">
           {state.message}
         </div>
       ) : null}
 
       <details className="mt-4 rounded-md border border-slate-200 bg-slate-50">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-semibold text-teal-800 hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-semibold text-[#0B3B82] hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
           Chỉnh sửa phí
           <span className="text-xs font-medium text-slate-500">Mở form</span>
         </summary>
@@ -88,7 +88,7 @@ export function FeeFields({ fees }: { fees?: Partial<FeeFieldsType> | null }) {
       <label className="block sm:col-span-2">
         <span className="text-sm font-medium text-slate-800">Phí khác</span>
         <textarea
-          className="mt-2 min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+          className="mt-2 min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
           defaultValue={fees?.other_fees ?? ""}
           name="other_fees"
         />
@@ -112,7 +112,7 @@ function TextField({
     <label className="block">
       <span className="text-sm font-medium text-slate-800">{label}</span>
       <input
-        className="mt-2 h-12 w-full rounded-md border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+        className="mt-2 h-12 w-full rounded-md border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         defaultValue={defaultValue}
         name={name}
         placeholder={placeholder}
@@ -126,7 +126,7 @@ function SubmitButton() {
 
   return (
     <button
-      className="flex h-12 w-full items-center justify-center rounded-md bg-teal-700 px-5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400 sm:w-auto"
+      className="flex h-12 w-full items-center justify-center rounded-md bg-[#0F5FD7] px-5 text-sm font-semibold text-white hover:bg-[#0B4FB5] disabled:cursor-not-allowed disabled:bg-[#94A3B8] sm:w-auto"
       disabled={pending}
       type="submit"
     >

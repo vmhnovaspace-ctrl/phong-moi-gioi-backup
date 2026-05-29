@@ -1,10 +1,10 @@
-import { BrokerDashboard } from "@/components/broker/broker-dashboard";
+import { BrokerInventoryView } from "@/components/broker/broker-inventory-view";
 import { requireRole } from "@/lib/auth/profile";
-import { getBrokerDashboard } from "@/lib/broker/queries";
+import { getBrokerInventory } from "@/lib/broker/queries";
 
 export default async function BrokerPage() {
-  const profile = await requireRole(["broker"]);
-  const dashboard = await getBrokerDashboard(profile.id);
+  await requireRole(["broker"]);
+  const inventory = await getBrokerInventory({});
 
-  return <BrokerDashboard dashboard={dashboard} />;
+  return <BrokerInventoryView inventory={inventory} />;
 }

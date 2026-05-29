@@ -26,6 +26,8 @@ export type Building = {
   common_amenities: string | null;
   house_rules: string | null;
   building_drive_folder_url: string | null;
+  zalo_group_url: string | null;
+  zalo_group_name: string | null;
   cover_image_url: string | null;
   public_slug: string;
   visibility: "visible" | "hidden";
@@ -126,17 +128,7 @@ export type RoomListItem = Room & {
 };
 
 export type RoomWithBuilding = Room & {
-  building: Pick<
-    Building,
-    | "id"
-    | "landlord_id"
-    | "name"
-    | "address"
-    | "ward"
-    | "district"
-    | "city"
-    | "building_drive_folder_url"
-  >;
+  building: Building;
   building_fees: BuildingFee | null;
   effective_fees: BuildingFee | RoomFee | null;
   fees: RoomFee | null;
@@ -152,7 +144,62 @@ export type BuildingDetail = BuildingSummary & {
 
 export type SellListGroup = {
   building: Building;
-  rooms: RoomWithBuilding[];
+  rooms: SellListRoom[];
+};
+
+export type RoomCloseRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export type LandlordRoomCloseRequest = {
+  id: string;
+  room_id: string;
+  broker_id: string;
+  landlord_id: string;
+  status: RoomCloseRequestStatus;
+  broker_note: string | null;
+  landlord_note: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  broker: {
+    id: string;
+    full_name: string;
+    phone: string | null;
+  } | null;
+};
+
+export type RoomSellEventType =
+  | "share_landlord"
+  | "share_building"
+  | "share_room"
+  | "closed_announcement";
+
+export type RoomSellEvent = {
+  id: string;
+  landlord_id: string;
+  building_id: string | null;
+  room_id: string | null;
+  event_type: RoomSellEventType;
+  created_by: string;
+  created_at: string;
+};
+
+export type SellListRoom = RoomWithBuilding & {
+  last_sell_event_at: string | null;
+  pending_close_request: LandlordRoomCloseRequest | null;
+};
+
+export type SellListClosedRoom = SellListRoom & {
+  closed_at: string;
+  closed_from_log: boolean;
+};
+
+export type SellListDashboard = {
+  groups: Array<{
+    building: Building;
+    rooms: SellListRoom[];
+  }>;
+  recently_closed: SellListClosedRoom[];
 };
 
 export type LandlordFormState = {

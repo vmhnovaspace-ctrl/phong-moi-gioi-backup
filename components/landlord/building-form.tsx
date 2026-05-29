@@ -24,8 +24,8 @@ export function BuildingForm({ building }: BuildingFormProps) {
     <form action={formAction} className="space-y-4">
       <FormError message={state.error} />
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Thông tin căn nhà</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Thông tin cơ bản</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <TextField
             defaultValue={building?.name}
@@ -51,10 +51,10 @@ export function BuildingForm({ building }: BuildingFormProps) {
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Vị trí bản đồ</h2>
+            <h2 className="text-base font-black text-slate-950">Địa chỉ / vị trí</h2>
             <p className="mt-1 text-sm leading-6 text-slate-500">
               Tự động chấm tọa độ bằng Google Maps API sẽ được làm ở module sau.
               Hiện tại có thể nhập Google Maps URL hoặc tọa độ thủ công.
@@ -62,7 +62,7 @@ export function BuildingForm({ building }: BuildingFormProps) {
           </div>
           {mapUrl ? (
             <a
-              className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
               href={mapUrl}
               rel="noreferrer"
               target="_blank"
@@ -106,8 +106,8 @@ export function BuildingForm({ building }: BuildingFormProps) {
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Mô tả và quy định</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Tiện ích / quy định</h2>
         <div className="mt-4 grid gap-4">
           <TextArea
             defaultValue={building?.description ?? ""}
@@ -127,14 +127,36 @@ export function BuildingForm({ building }: BuildingFormProps) {
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Ảnh Google Drive</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Ảnh / link Drive</h2>
         <div className="mt-4">
           <TextField
             defaultValue={building?.building_drive_folder_url ?? ""}
             label="Link thư mục Drive căn nhà"
             name="building_drive_folder_url"
             type="url"
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Ghi chú chia sẻ</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-500">
+          Dùng khi căn này có nhóm Zalo riêng để gửi phòng đang sell.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <TextField
+            className="sm:col-span-2"
+            defaultValue={building?.zalo_group_url ?? ""}
+            label="Link nhóm Zalo của căn này"
+            name="zalo_group_url"
+            type="url"
+          />
+          <TextField
+            className="sm:col-span-2"
+            defaultValue={building?.zalo_group_name ?? ""}
+            label="Tên nhóm Zalo"
+            name="zalo_group_name"
           />
         </div>
       </section>
@@ -150,7 +172,7 @@ function FormError({ message }: { message?: string }) {
   }
 
   return (
-    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
       {message}
     </div>
   );
@@ -161,7 +183,7 @@ function SubmitButton({ label }: { label: string }) {
 
   return (
     <button
-      className="flex h-12 w-full items-center justify-center rounded-md bg-teal-700 px-5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400 sm:w-auto"
+      className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#0F5FD7] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#0B4FB5] disabled:cursor-not-allowed disabled:bg-[#94A3B8] sm:w-auto"
       disabled={pending}
       type="submit"
     >
@@ -191,7 +213,7 @@ function TextField({
     <label className={`block ${className}`}>
       <span className="text-sm font-medium text-slate-800">{label}</span>
       <input
-        className="mt-2 h-12 w-full rounded-md border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+        className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         defaultValue={defaultValue ?? ""}
         inputMode={inputMode}
         name={name}
@@ -215,7 +237,7 @@ function TextArea({
     <label className="block">
       <span className="text-sm font-medium text-slate-800">{label}</span>
       <textarea
-        className="mt-2 min-h-28 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+        className="mt-2 min-h-28 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         defaultValue={defaultValue ?? ""}
         name={name}
       />

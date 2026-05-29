@@ -55,7 +55,7 @@ const badgeClasses: Record<NotificationKind, string> = {
   building: "border-sky-200 bg-sky-50 text-sky-700",
   new_room: "border-emerald-200 bg-emerald-50 text-emerald-700",
   price: "border-violet-200 bg-violet-50 text-violet-700",
-  status: "border-blue-200 bg-blue-50 text-blue-700",
+  status: "border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]",
   update: "border-slate-200 bg-slate-50 text-slate-700"
 };
 
@@ -280,19 +280,19 @@ export function BrokerRealtimeUpdates() {
   const visibleNotifications = useMemo(() => notifications, [notifications]);
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2">
-          <Bell className="mt-0.5 size-5 text-teal-700" aria-hidden />
+          <Bell className="mt-0.5 size-5 text-[#0F5FD7]" aria-hidden />
           <div>
             <h2 className="text-base font-bold text-slate-950">Thông báo cập nhật</h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              Feed realtime tạm thời trong phiên broker hiện tại.
+              Feed realtime tạm thời trong phiên môi giới hiện tại.
             </p>
           </div>
         </div>
         <button
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0F5FD7] px-4 text-sm font-bold text-white shadow-sm hover:bg-[#0B4FB5] disabled:cursor-wait disabled:opacity-70"
           disabled={isPending}
           onClick={() => {
             startTransition(() => {
@@ -312,8 +312,8 @@ export function BrokerRealtimeUpdates() {
       </div>
 
       {hasUpdate ? (
-        <div className="border-b border-teal-100 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-800">
-          Có cập nhật mới chưa tải lại dữ liệu.
+        <div className="border-b border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-sm font-bold text-[#0B3B82]">
+          Có cập nhật mới, bấm "Tải dữ liệu mới" để làm mới kho phòng.
         </div>
       ) : null}
 
@@ -322,7 +322,7 @@ export function BrokerRealtimeUpdates() {
           {visibleNotifications.map((item) => (
             <article
               className={`border-b border-slate-100 px-4 py-3 transition-colors last:border-b-0 ${
-                item.highlighted ? "bg-teal-50/70" : "bg-white"
+                item.highlighted ? "bg-[#EFF6FF]" : "bg-white"
               }`}
               key={item.id}
             >
@@ -351,7 +351,7 @@ export function BrokerRealtimeUpdates() {
             Chưa có cập nhật mới trong phiên này.
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            Khi landlord đổi phòng/căn, thông báo sẽ xuất hiện tại đây.
+            Khi chủ nhà đổi phòng/căn, thông báo sẽ xuất hiện tại đây.
           </p>
         </div>
       )}
@@ -382,7 +382,7 @@ function NotificationIcon({ kind }: { kind: NotificationKind }) {
 function buildRoomLeftInventoryNotification(roomId?: string): RealtimeNotification {
   return {
     badge: badgeLabels.status,
-    body: "Một phòng vừa rời khỏi danh sách broker sell.",
+    body: "Một phòng vừa rời khỏi danh sách môi giới đang sell.",
     createdAt: Date.now(),
     dedupeKey: roomId ? `room:${roomId}:left_inventory` : undefined,
     highlighted: true,

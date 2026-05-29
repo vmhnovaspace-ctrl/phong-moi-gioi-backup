@@ -12,6 +12,7 @@ import type {
 export type BrokerVisibleRoomStatus = Extract<RoomStatus, "available" | "coming_soon">;
 export type BoundaryMode = "old" | "new";
 export type BrokerPostChannel = "chotot" | "mogi" | "facebook" | "zalo";
+export type RoomCloseRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export type BrokerLandlordContact = {
   id: string;
@@ -45,6 +46,7 @@ export type BrokerRoomListItem = Pick<
   | "area_m2"
   | "rent_price"
   | "deposit_amount"
+  | "max_people"
   | "status"
   | "available_from"
   | "commission"
@@ -155,6 +157,19 @@ export type BrokerRoomActionState = {
   updated_at: string;
 };
 
+export type BrokerRoomCloseRequestState = {
+  id: string;
+  room_id: string;
+  broker_id: string;
+  landlord_id: string;
+  status: RoomCloseRequestStatus;
+  broker_note: string | null;
+  landlord_note: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+};
+
 export type BrokerRoomDetail = BrokerRoomListItem &
   Pick<Room, "description" | "strengths" | "weaknesses" | "max_people" | "public_slug" | "created_at"> & {
     building: BrokerRoomBuilding &
@@ -170,6 +185,7 @@ export type BrokerRoomDetail = BrokerRoomListItem &
     images: BrokerRoomImage[];
     landlord: BrokerLandlordContact | null;
     action: BrokerRoomActionState | null;
+    close_request: BrokerRoomCloseRequestState | null;
   };
 
 export type BrokerActionRoom = BrokerInventoryRoom & {
@@ -238,8 +254,10 @@ export type CustomerRoomPackageEvent = {
 };
 
 export type BrokerSendToCustomerData = {
+  customer_interest_events: CustomerRoomPackageEvent[];
   packages: CustomerRoomPackageSummary[];
   rooms: BrokerInventoryRoom[];
+  unread_customer_interest_count: number;
 };
 
 export type PublicPackageFeatureSet = Partial<Omit<RoomFeature, "id" | "room_id">>;

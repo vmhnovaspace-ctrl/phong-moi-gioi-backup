@@ -19,7 +19,7 @@ export default async function LandlordBuildingsPage() {
           </p>
         </div>
         <Link
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-teal-700 px-5 text-sm font-semibold text-white hover:bg-teal-800"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#0F5FD7] px-5 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
           href="/landlord/buildings/new"
         >
           <Plus className="size-4" aria-hidden />

@@ -9,6 +9,7 @@ import type {
   LandlordFormState,
   RoomFeature,
   RoomImage,
+  RoomSellEventType,
   RoomStatus
 } from "@/lib/landlord/types";
 import { createClient } from "@/lib/supabase/server";
@@ -107,6 +108,15 @@ function isFeeMode(value: string): value is FeeMode {
   return value === "building_default" || value === "room_override";
 }
 
+function isRoomSellEventType(value: string): value is RoomSellEventType {
+  return (
+    value === "share_landlord" ||
+    value === "share_building" ||
+    value === "share_room" ||
+    value === "closed_announcement"
+  );
+}
+
 async function requireOwnedBuilding(buildingId: string, landlordId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -170,7 +180,9 @@ function getBuildingPayload(formData: FormData) {
     latitude: parseOptionalCoordinate(formData, "latitude", "Vui lòng nhập vĩ độ hợp lệ."),
     longitude: parseOptionalCoordinate(formData, "longitude", "Vui lòng nhập kinh độ hợp lệ."),
     name,
-    ward: nullableString(formData, "ward")
+    ward: nullableString(formData, "ward"),
+    zalo_group_name: nullableString(formData, "zalo_group_name"),
+    zalo_group_url: nullableString(formData, "zalo_group_url")
   };
 }
 
@@ -180,6 +192,8 @@ function withoutMapFields<T extends Record<string, unknown>>(payload: T) {
     google_place_id: _googlePlaceId,
     latitude: _latitude,
     longitude: _longitude,
+    zalo_group_name: _zaloGroupName,
+    zalo_group_url: _zaloGroupUrl,
     ...rest
   } = payload;
 
@@ -194,8 +208,46 @@ function isMissingMapColumnError(error: { message?: string; code?: string }) {
     message.includes("latitude") ||
     message.includes("longitude") ||
     message.includes("formatted_address") ||
-    message.includes("google_place_id")
+    message.includes("google_place_id") ||
+    message.includes("zalo_group_name") ||
+    message.includes("zalo_group_url")
   );
+}
+
+function isMissingZaloMigrationError(error: { message?: string; code?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+
+  return (
+    error.code === "42703" ||
+    error.code === "PGRST204" ||
+    error.code === "PGRST205" ||
+    message.includes("landlord_zalo_group") ||
+    message.includes("zalo_group_name") ||
+    message.includes("zalo_group_url") ||
+    message.includes("room_sell_events") ||
+    message.includes("schema cache")
+  );
+}
+
+function isMissingRoomCloseRequestsTableError(error: { message?: string; code?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+
+  return (
+    error.code === "42P01" ||
+    error.code === "42703" ||
+    error.code === "PGRST204" ||
+    error.code === "PGRST205" ||
+    message.includes("room_close_requests") ||
+    message.includes("schema cache")
+  );
+}
+
+function missingZaloMigrationMessage() {
+  return "Database Supabase chưa có migration Zalo mới. Hãy chạy supabase/module_04_zalo_group_links.sql trong Supabase SQL Editor rồi lưu lại.";
+}
+
+function missingRoomCloseRequestsMigrationMessage() {
+  return "Chưa xử lý được yêu cầu báo chốt. Vui lòng thử lại hoặc báo quản trị viên kiểm tra cấu hình dữ liệu.";
 }
 
 function getFeePayload(formData: FormData) {
@@ -369,6 +421,216 @@ function revalidateLandlordPaths(buildingId?: string, roomId?: string) {
   }
 }
 
+function revalidateBrokerRoomPaths(roomId: string) {
+  revalidatePath("/broker");
+  revalidatePath("/broker/rooms");
+  revalidatePath("/broker/saved");
+  revalidatePath("/broker/actions");
+  revalidatePath("/broker/send");
+  revalidatePath(`/broker/rooms/${roomId}`);
+}
+
+type CloseRequestRoomRow = {
+  id: string;
+  status: string;
+  room_id: string;
+  landlord_id: string;
+  rooms:
+    | {
+        id: string;
+        status: string;
+        building_id: string;
+        public_slug: string;
+        buildings:
+          | { id: string; landlord_id: string; public_slug: string }
+          | Array<{ id: string; landlord_id: string; public_slug: string }>;
+      }
+    | Array<{
+        id: string;
+        status: string;
+        building_id: string;
+        public_slug: string;
+        buildings:
+          | { id: string; landlord_id: string; public_slug: string }
+          | Array<{ id: string; landlord_id: string; public_slug: string }>;
+      }>;
+};
+
+function firstRelation<T>(value: T | T[] | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+async function loadOwnedCloseRequest(requestId: string, landlordId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("room_close_requests")
+    .select(
+      "id, status, room_id, landlord_id, rooms!inner(id, status, building_id, public_slug, buildings!inner(id, landlord_id, public_slug))"
+    )
+    .eq("id", requestId)
+    .maybeSingle<CloseRequestRoomRow>();
+
+  if (error) {
+    if (isMissingRoomCloseRequestsTableError(error)) {
+      throw new Error(missingRoomCloseRequestsMigrationMessage());
+    }
+
+    throw new Error(error.message);
+  }
+
+  const room = firstRelation(data?.rooms);
+  const building = firstRelation(room?.buildings);
+
+  if (!data || !room || !building || data.landlord_id !== landlordId || building.landlord_id !== landlordId) {
+    throw new Error("Không tìm thấy yêu cầu báo chốt thuộc phòng của bạn.");
+  }
+
+  return { building, request: data, room };
+}
+
+export async function updateLandlordZaloGroupAction(
+  _previousState: LandlordFormState,
+  formData: FormData
+): Promise<LandlordFormState> {
+  const profile = await requireRole(["landlord"]);
+
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        landlord_zalo_group_name: nullableString(formData, "landlord_zalo_group_name"),
+        landlord_zalo_group_url: nullableString(formData, "landlord_zalo_group_url")
+      })
+      .eq("id", profile.id)
+      .eq("role", "landlord");
+
+    if (error) {
+      if (isMissingZaloMigrationError(error)) {
+        return { error: missingZaloMigrationMessage() };
+      }
+
+      return { error: error.message };
+    }
+
+    revalidatePath("/landlord");
+    revalidatePath("/landlord/sell-list");
+    return { message: "Đã lưu nhóm Zalo tổng." };
+  } catch (error) {
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    throw error;
+  }
+}
+
+export async function updateBuildingZaloGroupAction(
+  buildingId: string,
+  _previousState: LandlordFormState,
+  formData: FormData
+): Promise<LandlordFormState> {
+  const profile = await requireRole(["landlord"]);
+
+  try {
+    const supabase = await createClient();
+    await requireOwnedBuilding(buildingId, profile.id);
+
+    const { error } = await supabase
+      .from("buildings")
+      .update({
+        zalo_group_name: nullableString(formData, "zalo_group_name"),
+        zalo_group_url: nullableString(formData, "zalo_group_url")
+      })
+      .eq("id", buildingId)
+      .eq("landlord_id", profile.id);
+
+    if (error) {
+      if (isMissingZaloMigrationError(error)) {
+        return { error: missingZaloMigrationMessage() };
+      }
+
+      return { error: error.message };
+    }
+
+    revalidateLandlordPaths(buildingId);
+    return { message: "Đã lưu nhóm Zalo của căn." };
+  } catch (error) {
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    throw error;
+  }
+}
+
+export async function recordRoomSellEventAction(
+  eventType: RoomSellEventType,
+  options: { buildingId?: string; roomId?: string } = {}
+): Promise<LandlordFormState> {
+  const profile = await requireRole(["landlord"]);
+
+  if (!isRoomSellEventType(eventType)) {
+    return { error: "Loại sự kiện sell không hợp lệ." };
+  }
+
+  try {
+    const supabase = await createClient();
+    let buildingId = options.buildingId ?? null;
+    const roomId = options.roomId ?? null;
+
+    if (eventType === "share_building") {
+      if (!buildingId) {
+        return { error: "Thiếu căn nhà cần ghi nhận." };
+      }
+
+      await requireOwnedBuilding(buildingId, profile.id);
+    }
+
+    if (eventType === "share_room" || eventType === "closed_announcement") {
+      if (!roomId) {
+        return { error: "Thiếu phòng cần ghi nhận." };
+      }
+
+      const ownedRoom = await requireOwnedRoom(roomId, profile.id);
+      buildingId = ownedRoom.building_id;
+    }
+
+    if (eventType === "share_landlord") {
+      buildingId = null;
+    }
+
+    const { error } = await supabase.from("room_sell_events").insert({
+      building_id: buildingId,
+      created_by: profile.id,
+      event_type: eventType,
+      landlord_id: profile.id,
+      room_id: roomId
+    });
+
+    if (error) {
+      if (isMissingZaloMigrationError(error)) {
+        return { error: missingZaloMigrationMessage() };
+      }
+
+      return { error: error.message };
+    }
+
+    revalidateLandlordPaths(buildingId ?? undefined, roomId ?? undefined);
+    return { message: "Đã ghi nhận thao tác Zalo." };
+  } catch (error) {
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    throw error;
+  }
+}
+
 export async function createBuildingAction(
   _previousState: LandlordFormState,
   formData: FormData
@@ -390,6 +652,13 @@ export async function createBuildingAction(
       .single<{ id: string }>();
 
     if (error && isMissingMapColumnError(error)) {
+      if (
+        isMissingZaloMigrationError(error) &&
+        (payload.zalo_group_url || payload.zalo_group_name)
+      ) {
+        return { error: missingZaloMigrationMessage() };
+      }
+
       const fallbackPayload = withoutMapFields(payload);
       const fallback = await supabase
         .from("buildings")
@@ -443,6 +712,13 @@ export async function updateBuildingAction(
       .eq("landlord_id", profile.id);
 
     if (error && isMissingMapColumnError(error)) {
+      if (
+        isMissingZaloMigrationError(error) &&
+        (payload.zalo_group_url || payload.zalo_group_name)
+      ) {
+        return { error: missingZaloMigrationMessage() };
+      }
+
       const fallback = await supabase
         .from("buildings")
         .update(withoutMapFields(payload))
@@ -643,7 +919,7 @@ export async function quickUpdateRoomAction(formData: FormData) {
   const { error } = await supabase
     .from("rooms")
     .update({
-      available_from: nullableString(formData, "available_from"),
+      available_from: status === "coming_soon" ? nullableString(formData, "available_from") : null,
       deposit_amount: parseOptionalMoney(formData, "deposit_amount"),
       rent_price: parseRequiredMoney(formData, "rent_price"),
       status
@@ -655,6 +931,152 @@ export async function quickUpdateRoomAction(formData: FormData) {
   }
 
   revalidateLandlordPaths(ownedRoom.building_id, roomId);
+}
+
+export async function markRoomRentedFromSellListAction(roomId: string): Promise<LandlordFormState> {
+  const profile = await requireRole(["landlord"]);
+
+  try {
+    const ownedRoom = await requireOwnedRoom(roomId, profile.id);
+    const currentStatus = typeof ownedRoom.status === "string" ? ownedRoom.status : "";
+
+    if (currentStatus !== "available" && currentStatus !== "coming_soon") {
+      return { error: "Chỉ có thể chốt phòng đang trống hoặc sắp trống." };
+    }
+
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("rooms")
+      .update({
+        available_from: null,
+        status: "rented"
+      })
+      .eq("id", roomId);
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    revalidateLandlordPaths(ownedRoom.building_id, roomId);
+    return { message: "Đã chốt phòng. Phòng đã chuyển sang trạng thái đã thuê." };
+  } catch (error) {
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    throw error;
+  }
+}
+
+export async function confirmRoomCloseRequest(requestId: string): Promise<LandlordFormState> {
+  const profile = await requireRole(["landlord"]);
+
+  try {
+    const { building, request, room } = await loadOwnedCloseRequest(requestId, profile.id);
+
+    if (request.status !== "pending") {
+      return { error: "Yêu cầu báo chốt này đã được xử lý." };
+    }
+
+    const supabase = await createClient();
+    const { error: roomError } = await supabase
+      .from("rooms")
+      .update({
+        available_from: null,
+        status: "rented"
+      })
+      .eq("id", room.id);
+
+    if (roomError) {
+      return { error: roomError.message };
+    }
+
+    const { data: updatedRequest, error: requestError } = await supabase
+      .from("room_close_requests")
+      .update({
+        resolved_at: new Date().toISOString(),
+        resolved_by: profile.id,
+        status: "approved"
+      })
+      .eq("id", requestId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle<{ id: string }>();
+
+    if (requestError) {
+      if (isMissingRoomCloseRequestsTableError(requestError)) {
+        return { error: missingRoomCloseRequestsMigrationMessage() };
+      }
+
+      return { error: requestError.message };
+    }
+
+    if (!updatedRequest) {
+      return { error: "Yêu cầu báo chốt này đã được xử lý." };
+    }
+
+    revalidateLandlordPaths(building.id, room.id);
+    revalidateBrokerRoomPaths(room.id);
+    revalidatePath(`/l/${profile.public_slug}`);
+    revalidatePath(`/b/${building.public_slug}`);
+    revalidatePath(`/r/${room.public_slug}`);
+
+    return { message: "Đã xác nhận báo chốt. Phòng đã chuyển sang Đã thuê." };
+  } catch (error) {
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    throw error;
+  }
+}
+
+export async function rejectRoomCloseRequest(requestId: string): Promise<LandlordFormState> {
+  const profile = await requireRole(["landlord"]);
+
+  try {
+    const { building, request, room } = await loadOwnedCloseRequest(requestId, profile.id);
+
+    if (request.status !== "pending") {
+      return { error: "Yêu cầu báo chốt này đã được xử lý." };
+    }
+
+    const supabase = await createClient();
+    const { data: updatedRequest, error } = await supabase
+      .from("room_close_requests")
+      .update({
+        resolved_at: new Date().toISOString(),
+        resolved_by: profile.id,
+        status: "rejected"
+      })
+      .eq("id", requestId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle<{ id: string }>();
+
+    if (error) {
+      if (isMissingRoomCloseRequestsTableError(error)) {
+        return { error: missingRoomCloseRequestsMigrationMessage() };
+      }
+
+      return { error: error.message };
+    }
+
+    if (!updatedRequest) {
+      return { error: "Yêu cầu báo chốt này đã được xử lý." };
+    }
+
+    revalidateLandlordPaths(building.id, room.id);
+    revalidateBrokerRoomPaths(room.id);
+
+    return { message: "Đã từ chối báo chốt. Phòng vẫn nằm trong danh sách sell." };
+  } catch (error) {
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    throw error;
+  }
 }
 
 export async function duplicateRoomAction(

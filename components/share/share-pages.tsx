@@ -100,7 +100,7 @@ export function BuildingShareView({ data }: { data: BuildingSharePageData }) {
       subtitle={formatLocation(building)}
       title={building.name}
     >
-      <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <SafeImage
           alt={building.name}
           className="aspect-[16/9] w-full object-cover"
@@ -187,7 +187,7 @@ export function RoomShareView({ data }: { data: RoomSharePageData }) {
       subtitle={formatFullAddress(building)}
       title={room.title || `Phòng ${room.room_code}`}
     >
-      <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <SafeImage
           alt={room.title || `Phòng ${room.room_code}`}
           className="aspect-[4/3] w-full object-cover sm:aspect-[16/8]"
@@ -295,7 +295,7 @@ function BuildingSection({ building }: { building: ShareBuilding }) {
   const images = displayImages(building.cover_image_url, building.images);
 
   return (
-    <article className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="grid md:grid-cols-[220px_minmax(0,1fr)]">
         <SafeImage
           alt={building.name}
@@ -308,7 +308,7 @@ function BuildingSection({ building }: { building: ShareBuilding }) {
             <div>
               <h2 className="flex items-center gap-2 text-lg font-bold text-slate-950">
                 <Building2 className="size-5 text-teal-700" aria-hidden />
-                {building.name}
+                <span className="truncate">{building.name}</span>
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">{formatFullAddress(building)}</p>
             </div>
@@ -351,18 +351,18 @@ function RoomSummaryCard({ room }: { room: ShareRoom }) {
   const images = displayImages(room.cover_image_url, room.images);
 
   return (
-    <article className="rounded-md border border-slate-200 bg-slate-50/70 p-3">
+    <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
       <div className="grid gap-3 sm:grid-cols-[96px_minmax(0,1fr)]">
         <SafeImage
           alt={room.title || `Phòng ${room.room_code}`}
-          className="aspect-[4/3] w-full rounded-md object-cover"
-          fallbackClassName="flex aspect-[4/3] w-full items-center justify-center rounded-md bg-slate-100 text-slate-400"
+          className="aspect-[4/3] w-full rounded-xl object-cover"
+          fallbackClassName="flex aspect-[4/3] w-full items-center justify-center rounded-xl bg-slate-100 text-slate-400"
           src={images[0]}
         />
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-base font-bold text-slate-950">
+              <h3 className="truncate text-base font-black text-slate-950">
                 {room.title || `Phòng ${room.room_code}`}
               </h3>
               <p className="mt-1 text-xs text-slate-500">
@@ -412,7 +412,7 @@ function ShareShell({
             <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">{title}</h1>
             {subtitle ? <p className="mt-2 text-sm leading-6 text-slate-600">{subtitle}</p> : null}
           </div>
-          {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
+          {actions ? <div className="grid grid-cols-1 gap-2 sm:flex sm:shrink-0 sm:flex-wrap">{actions}</div> : null}
         </div>
       </header>
       <div className="mx-auto grid w-full max-w-5xl gap-5 px-4 py-5">{children}</div>
@@ -422,8 +422,8 @@ function ShareShell({
 
 function Section({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-base font-bold text-slate-950">{title}</h2>
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-base font-black text-slate-950">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -444,16 +444,16 @@ function TextBlock({ title, value }: { title: string; value: string | null }) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
       <p className="text-2xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-xs font-medium text-slate-500">{label}</p>
+      <p className="mt-1 text-xs font-bold text-slate-500">{label}</p>
     </div>
   );
 }
 
 function Info({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-md bg-white p-3 ring-1 ring-slate-200">
+    <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
       <p className="text-xs text-slate-500">{label}</p>
       <div className="mt-1 text-sm font-bold text-slate-950">{value}</div>
     </div>
@@ -471,7 +471,7 @@ function Chip({ label }: { label: string }) {
 function LinkButton({ href, label }: { href: string; label: string }) {
   return (
     <Link
-      className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-700 px-3 text-sm font-bold text-white shadow-sm hover:bg-teal-800"
       href={href}
     >
       {label}
@@ -482,7 +482,7 @@ function LinkButton({ href, label }: { href: string; label: string }) {
 function DriveButton({ href, label }: { href: string; label: string }) {
   return (
     <a
-      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 text-sm font-bold text-blue-800 hover:bg-blue-100 sm:w-auto"
+      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-bold text-blue-800 hover:bg-blue-100 sm:w-auto"
       href={href}
       rel="noreferrer"
       target="_blank"

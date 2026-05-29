@@ -21,26 +21,26 @@ export function RoleShell({
   title
 }: RoleShellProps) {
   return (
-    <main className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <main className="min-h-screen bg-[#F8FAFC]">
+      <header className="border-b border-[#E2E8F0] bg-white">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-teal-700">Kho Phòng Realtime</p>
-            <h1 className="mt-1 text-2xl font-bold text-slate-950">{title}</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+            <p className="text-sm font-semibold text-[#0F5FD7]">Kho Phòng Realtime</p>
+            <h1 className="mt-1 text-2xl font-bold text-[#0F172A]">{title}</h1>
+            <p className="mt-1 text-sm leading-6 text-[#334155]">{description}</p>
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:min-w-72">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 sm:min-w-72">
             <div>
-              <p className="text-sm font-semibold text-slate-950">{profile.full_name}</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm font-semibold text-[#0F172A]">{profile.full_name}</p>
+              <p className="text-xs text-[#64748B]">
                 {roleLabels[profile.role]} · {statusLabels[profile.status]}
                 {profile.phone ? ` · ${profile.phone}` : ""}
               </p>
             </div>
             <Link
               aria-label="Đổi mật khẩu"
-              className="flex size-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+              className="flex size-11 items-center justify-center rounded-xl border border-[#D8E2F0] bg-white text-[#334155] hover:bg-[#EFF6FF] hover:text-[#0F5FD7]"
               href="/account/change-password"
             >
               <KeyRound className="size-4" aria-hidden />
@@ -48,7 +48,7 @@ export function RoleShell({
             <form action={logoutAction}>
               <button
                 aria-label="Đăng xuất"
-                className="flex size-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                className="flex size-11 items-center justify-center rounded-xl border border-[#D8E2F0] bg-white text-[#334155] hover:bg-[#EFF6FF] hover:text-[#0F5FD7]"
                 type="submit"
               >
                 <LogOut className="size-4" aria-hidden />

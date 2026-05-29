@@ -23,7 +23,7 @@ export function BrokerRoomReportPanel({ roomId }: BrokerRoomReportPanelProps) {
         <h3 className="text-base font-bold text-slate-950">Báo sai thông tin</h3>
       </div>
       <p className="mt-1 text-sm text-slate-600">
-        Gửi phản hồi để admin/landlord kiểm tra lại dữ liệu phòng.
+        Gửi phản hồi để admin/chủ nhà kiểm tra lại dữ liệu phòng.
       </p>
 
       <form action={formAction} className="mt-4 space-y-3">

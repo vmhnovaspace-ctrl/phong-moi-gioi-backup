@@ -17,9 +17,9 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-950">Kho phòng broker</h2>
+          <h2 className="text-2xl font-black text-slate-950">Kho phòng môi giới</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-            Duyệt phòng theo cây Chủ nhà → Căn nhà → Phòng, chỉ gồm dữ liệu visible và broker có quyền xem.
+            Duyệt phòng theo cây Chủ nhà → Căn nhà → Phòng, chỉ gồm dữ liệu visible và môi giới có quyền xem.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 sm:min-w-[420px]">
@@ -40,17 +40,17 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
         <section className="space-y-4">
           {groups.map((landlordGroup) => (
             <div
-              className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
               key={landlordGroup.landlord?.id ?? landlordGroup.buildings[0]?.building.landlord_id}
             >
               <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-teal-50 text-teal-700">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#0F5FD7]">
                       <UserRound className="size-5" aria-hidden />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="truncate text-base font-bold text-slate-950">
+                    <h3 className="truncate text-base font-black text-slate-950">
                         {landlordGroup.landlord?.full_name ?? "Chủ nhà"}
                       </h3>
                       {landlordGroup.landlord?.phone ? (
@@ -58,7 +58,7 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
                       ) : null}
                     </div>
                   </div>
-                  <span className="w-fit rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700">
+                  <span className="w-fit rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-bold text-slate-700">
                     {landlordGroup.total_rooms} phòng sell
                   </span>
                 </div>
@@ -67,13 +67,13 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
               <div className="space-y-3 p-3 sm:p-4">
                 {landlordGroup.buildings.map((buildingGroup) => (
                   <section
-                    className="rounded-lg border border-slate-200 bg-white"
+                    className="rounded-2xl border border-slate-200 bg-white"
                     key={buildingGroup.building.id}
                   >
                     <div className="border-b border-slate-100 px-4 py-3">
                       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0">
-                          <h4 className="font-bold text-slate-950">{buildingGroup.building.name}</h4>
+                          <h4 className="font-black text-slate-950">{buildingGroup.building.name}</h4>
                           <p className="mt-1 line-clamp-2 text-sm text-slate-500">
                             {buildingGroup.building.address}
                             {buildingGroup.building.ward ? ` · ${buildingGroup.building.ward}` : ""}
@@ -81,10 +81,10 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                          <span className="rounded-full bg-green-50 px-2.5 py-1 text-green-700">
+                          <span className="rounded-full border border-[#A7F3D0] bg-[#ECFDF5] px-2.5 py-1 text-[#047857]">
                             {buildingGroup.available_rooms} đang trống
                           </span>
-                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
+                          <span className="rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1 text-[#1D4ED8]">
                             {buildingGroup.coming_soon_rooms} sắp trống
                           </span>
                         </div>
@@ -102,11 +102,11 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
           ))}
         </section>
       ) : (
-        <section className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
+        <section className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center shadow-sm">
           <Building2 className="mx-auto size-9 text-slate-300" aria-hidden />
           <h3 className="mt-3 text-base font-semibold text-slate-950">Không có phòng phù hợp</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-            Thử xóa bớt bộ lọc hoặc dùng từ khóa rộng hơn để xem các phòng broker có quyền truy cập.
+            Thử xóa bớt bộ lọc hoặc dùng từ khóa rộng hơn để xem các phòng môi giới có quyền truy cập.
           </p>
         </section>
       )}
@@ -124,7 +124,7 @@ function SmallMetric({
   value: number;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
       <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
         <span className="text-slate-400">{icon}</span>
         <span className="truncate">{label}</span>

@@ -21,17 +21,20 @@ export default async function BuildingSellListPage({ params }: PageProps) {
 
   return (
     <div className="space-y-5">
-      <Link className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50" href={`/landlord/buildings/${id}`}>
+      <Link
+        className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+        href={`/landlord/buildings/${id}`}
+      >
         <ArrowLeft className="size-4" aria-hidden />
         Quay lại căn nhà
       </Link>
       <div>
-        <h2 className="text-xl font-bold text-slate-950">Phòng sell của {building.name}</h2>
+        <h2 className="text-xl font-bold text-slate-950">Sell phòng của {building.name}</h2>
         <p className="mt-1 text-sm text-slate-600">
           Chỉ gồm phòng đang trống và sắp trống trong căn này.
         </p>
       </div>
-      <SellListView groups={groups} />
+      <SellListView groups={groups} landlord={profile} mode="building" />
     </div>
   );
 }

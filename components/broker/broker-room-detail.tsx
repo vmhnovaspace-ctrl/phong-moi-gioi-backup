@@ -91,7 +91,7 @@ export function BrokerRoomDetail({ room }: BrokerRoomDetailProps) {
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={room.status} />
                 {room.commission ? (
-                  <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">
+                  <span className="rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1 text-xs font-semibold text-[#0F5FD7]">
                     HH {room.commission}
                   </span>
                 ) : null}
@@ -240,7 +240,12 @@ export function BrokerRoomDetail({ room }: BrokerRoomDetailProps) {
               <CopyLinkButton label="Copy link phòng" path={`/r/${room.public_slug}`} />
             </div>
           </Section>
-          <BrokerRoomActionsPanel action={room.action} roomId={room.id} />
+          <BrokerRoomActionsPanel
+            action={room.action}
+            closeRequest={room.close_request}
+            roomId={room.id}
+            roomStatus={room.status}
+          />
           <BrokerRoomReportPanel roomId={room.id} />
 
           <Section title="Thông tin chủ nhà">
@@ -251,7 +256,7 @@ export function BrokerRoomDetail({ room }: BrokerRoomDetailProps) {
                   <PlainDetail
                     label="Điện thoại"
                     value={
-                      <a className="font-semibold text-teal-700 hover:text-teal-900" href={`tel:${room.landlord.phone}`}>
+                      <a className="font-semibold text-[#0F5FD7] hover:text-[#0B3B82]" href={`tel:${room.landlord.phone}`}>
                         <Phone className="mr-1 inline size-3.5" aria-hidden />
                         {room.landlord.phone}
                       </a>

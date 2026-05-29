@@ -50,7 +50,7 @@ export function BrokerRoomNotePanel({ initialValue, roomId }: BrokerRoomNotePane
       </div>
 
       <textarea
-        className="mt-4 min-h-36 w-full rounded-md border border-slate-300 px-3 py-2 text-sm leading-6 text-slate-800 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        className="mt-4 min-h-36 w-full rounded-md border border-slate-300 px-3 py-2 text-sm leading-6 text-slate-800 outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         onChange={(event) => setNote(event.target.value)}
         placeholder="Ví dụ: Khách A thích phòng này, hẹn xem lúc 18h, cần hỏi thêm phí xe..."
         value={note}
@@ -67,7 +67,7 @@ export function BrokerRoomNotePanel({ initialValue, roomId }: BrokerRoomNotePane
           Xóa ghi chú
         </button>
         <button
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5] disabled:opacity-60"
           disabled={isPending}
           onClick={() => persist(note, "Đã lưu ghi chú.")}
           type="button"

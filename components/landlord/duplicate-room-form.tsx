@@ -30,7 +30,7 @@ export function DuplicateRoomForm({ room }: { room: RoomWithBuilding }) {
       <label className="block">
         <span className="text-sm font-medium text-slate-800">Mã phòng cần tạo</span>
         <textarea
-          className="mt-2 min-h-28 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+          className="mt-2 min-h-28 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
           name="room_codes"
           placeholder="101, 201, 301"
           required
@@ -40,7 +40,7 @@ export function DuplicateRoomForm({ room }: { room: RoomWithBuilding }) {
       <label className="block">
         <span className="text-sm font-medium text-slate-800">Trạng thái mặc định</span>
         <select
-          className="mt-2 h-12 w-full rounded-md border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+          className="mt-2 h-12 w-full rounded-md border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
           defaultValue="hidden"
           name="new_status"
         >
@@ -81,7 +81,7 @@ function SubmitButton() {
 
   return (
     <button
-      className="flex h-12 w-full items-center justify-center rounded-md bg-teal-700 px-5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400 sm:w-auto"
+      className="flex h-12 w-full items-center justify-center rounded-md bg-[#0F5FD7] px-5 text-sm font-semibold text-white hover:bg-[#0B4FB5] disabled:cursor-not-allowed disabled:bg-[#94A3B8] sm:w-auto"
       disabled={pending}
       type="submit"
     >

@@ -290,6 +290,96 @@ export function buildRoomShareText(
   ]);
 }
 
+export function buildLandlordSellZaloText(
+  data: {
+    landlord?: ({ full_name?: string | null } & SlugSource) | null;
+    groups: Array<{ building: BuildingTemplateData; rooms: BuildingTemplateRoom[] }>;
+  },
+  baseUrl: string
+) {
+  const groups = data.groups
+    .map((group) => ({
+      building: group.building,
+      rooms: group.rooms.filter(
+        (room) => room.visibility !== "hidden" && SELLABLE_STATUSES.includes(room.status)
+      )
+    }))
+    .filter((group) => group.rooms.length > 0);
+  const roomTotal = groups.reduce((total, group) => total + group.rooms.length, 0);
+  const landlordName = cleanText(data.landlord?.full_name) || "chủ nhà";
+
+  return compactBlocks([
+    `Kho phòng đang sell của ${landlordName}:`,
+    `Hiện có ${roomTotal} phòng đang trống/sắp trống tại ${groups.length} căn:`,
+    ...groups.flatMap((group) => [
+      `${buildingDisplayName(group.building)}:`,
+      compactLines(group.rooms.map((room) => `- ${shortSellRoomLine(room)}`))
+    ]),
+    compactLines([
+      "Xem toàn bộ kho phòng cập nhật realtime:",
+      absoluteShareUrl(baseUrl, `/l/${data.landlord?.public_slug ?? ""}`)
+    ])
+  ]);
+}
+
+export function buildBuildingSellZaloText(
+  building: BuildingTemplateData,
+  roomsInput: BuildingTemplateRoom[],
+  baseUrl: string
+) {
+  const rooms = roomsInput.filter(
+    (room) => room.visibility !== "hidden" && SELLABLE_STATUSES.includes(room.status)
+  );
+  const buildingName = cleanText(building.name) || "căn";
+
+  return compactBlocks([
+    `Căn ${buildingName} hiện có ${rooms.length} phòng đang sell:`,
+    compactLines(rooms.map((room) => `- ${shortSellRoomLine(room)}`)),
+    compactLines([
+      "Xem chi tiết và ảnh cập nhật tại:",
+      absoluteShareUrl(baseUrl, `/b/${building.public_slug ?? ""}`)
+    ])
+  ]);
+}
+
+export function buildRoomPushZaloText(
+  data: { building: RoomTemplateBuilding; room: RoomTemplateData },
+  baseUrl: string
+) {
+  const { building, room } = data;
+
+  return compactBlocks([
+    `Đẩy lại phòng ${cleanText(room.room_code) || ""} - ${cleanText(building.name) || "Căn nhà"}`,
+    compactLines([
+      formatCurrencyVnd(room.rent_price) ? `Giá: ${formatCurrencyVnd(room.rent_price)}/tháng` : null,
+      `Trạng thái: ${roomStatusWithDate(room)}`,
+      formatArea(room.area_m2) ? `Diện tích: ${formatArea(room.area_m2)}` : null,
+      formatCurrencyVnd(room.deposit_amount) ? `Cọc: ${formatCurrencyVnd(room.deposit_amount)}` : null
+    ]),
+    compactLines([
+      "Xem ảnh và chi tiết:",
+      absoluteShareUrl(baseUrl, `/r/${room.public_slug ?? ""}`)
+    ])
+  ]);
+}
+
+export function buildClosedRoomZaloText(
+  data: { building: RoomTemplateBuilding; room: RoomTemplateData },
+  baseUrl: string
+) {
+  const { building, room } = data;
+  const address = compactAddress(building.address, building.district);
+
+  return compactBlocks([
+    `Phòng ${cleanText(room.room_code) || ""} tại ${cleanText(building.name) || "căn nhà"}${address ? ` - ${address}` : ""} đã chốt.`,
+    "Cảm ơn anh/chị em sale đã hỗ trợ.",
+    compactLines([
+      "Kho phòng đã được cập nhật tại:",
+      absoluteShareUrl(baseUrl, `/b/${building.public_slug ?? ""}`)
+    ])
+  ]);
+}
+
 function roomSummaryLines(room: BuildingTemplateRoom, index: number) {
   return [
     `${index + 1}. ${compactInline([room.room_code ? `Phòng ${room.room_code}` : "Phòng", room.title], " - ")}`,
@@ -299,6 +389,26 @@ function roomSummaryLines(room: BuildingTemplateRoom, index: number) {
     formatDateVi(room.available_from) ? `   - Ngày vào: ${formatDateVi(room.available_from)}` : null,
     cleanText(room.strengths) ? `   - Điểm mạnh: ${cleanText(room.strengths)}` : null
   ];
+}
+
+function shortSellRoomLine(room: BuildingTemplateRoom) {
+  return compactInline(
+    [
+      cleanText(room.room_code) ? `Phòng ${cleanText(room.room_code)}` : "Phòng",
+      formatCurrencyVnd(room.rent_price),
+      roomStatusWithDate(room),
+      formatArea(room.area_m2)
+    ],
+    " | "
+  );
+}
+
+function roomStatusWithDate(room: Pick<BuildingTemplateRoom, "status" | "available_from">) {
+  if (room.status === "coming_soon" && formatDateVi(room.available_from)) {
+    return `Sắp trống ngày ${formatDateVi(room.available_from)}`;
+  }
+
+  return getRoomStatusLabel(room.status);
 }
 
 function buildFeeLines(fees: Partial<FeeFields & { parking_fee?: string | null }> | null | undefined) {

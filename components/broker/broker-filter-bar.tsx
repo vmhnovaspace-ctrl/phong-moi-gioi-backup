@@ -41,28 +41,28 @@ export function BrokerFilterBar({
   );
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <form action="/broker/rooms" className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <Filter className="size-4 text-teal-700" aria-hidden />
-              <h3 className="font-semibold text-slate-950">Tìm phòng nhanh</h3>
+              <Filter className="size-4 text-[#0F5FD7]" aria-hidden />
+              <h3 className="text-base font-black text-slate-950">Tìm phòng nhanh</h3>
             </div>
             <p className="mt-1 text-sm text-slate-500">
-              Đang hiển thị {resultCount}/{totalCount} phòng broker có quyền xem.
+              Đang hiển thị {resultCount}/{totalCount} phòng môi giới có quyền xem.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex">
             <Link
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
               href="/broker/rooms"
             >
               <RotateCcw className="size-4" aria-hidden />
               Xóa lọc
             </Link>
             <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0F5FD7] px-4 text-sm font-bold text-white shadow-sm hover:bg-[#0B4FB5]"
               type="submit"
             >
               <Search className="size-4" aria-hidden />
@@ -71,7 +71,7 @@ export function BrokerFilterBar({
           </div>
         </div>
 
-        <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
+        <fieldset className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
           <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">Tìm kiếm</legend>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(220px,0.8fr)]">
             <TextInput
@@ -89,13 +89,13 @@ export function BrokerFilterBar({
           </div>
         </fieldset>
 
-        <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
+        <fieldset className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
           <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">Vị trí</legend>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="space-y-1.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Kiểu địa giới</span>
               <select
-                className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
                 name="boundaryMode"
                 onChange={(event) => {
                   const nextMode = event.target.value === "new" ? "new" : "old";
@@ -139,13 +139,13 @@ export function BrokerFilterBar({
           </div>
         </fieldset>
 
-        <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
+        <fieldset className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
           <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">Giá và diện tích</legend>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <label className="space-y-1.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</span>
               <select
-                className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
                 defaultValue={filters.status ?? "all"}
                 name="status"
               >
@@ -161,7 +161,7 @@ export function BrokerFilterBar({
           </div>
         </fieldset>
 
-        <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
+        <fieldset className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
           <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">Tiện ích</legend>
           <div className="flex flex-wrap gap-2">
             <CheckboxPill checked={Boolean(filters.furnished)} label="Có nội thất" name="furnished" />
@@ -197,7 +197,7 @@ function TextInput({
     <label className="space-y-1.5">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
       <input
-        className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         defaultValue={defaultValue}
         name={name}
         placeholder={placeholder}
@@ -227,7 +227,7 @@ function SelectInput({
     <label className="space-y-1.5">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
       <select
-        className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
         disabled={disabled}
         name={name}
         onChange={(event) => onChange(event.target.value)}
@@ -259,7 +259,7 @@ function NumberInput({
     <label className="space-y-1.5">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
       <input
-        className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         defaultValue={value ?? ""}
         inputMode="numeric"
         min={0}
@@ -281,8 +281,8 @@ function CheckboxPill({
   name: string;
 }) {
   return (
-    <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-      <input className="size-4 accent-teal-700" defaultChecked={checked} name={name} type="checkbox" value="1" />
+    <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+      <input className="size-4 accent-[#0F5FD7]" defaultChecked={checked} name={name} type="checkbox" value="1" />
       {label}
     </label>
   );

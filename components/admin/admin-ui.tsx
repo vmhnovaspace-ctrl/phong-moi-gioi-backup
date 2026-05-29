@@ -28,7 +28,7 @@ export function AdminBadge({ children, tone = "slate" }: { children: React.React
   return (
     <span
       className={clsx(
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold leading-none",
         toneClasses[tone]
       )}
     >
@@ -109,7 +109,7 @@ export function AdminNotice({
   return (
     <div
       className={clsx(
-        "rounded-md border px-4 py-3 text-sm font-medium",
+        "rounded-xl border px-4 py-3 text-sm font-bold",
         errorText
           ? "border-red-200 bg-red-50 text-red-700"
           : "border-green-200 bg-green-50 text-green-700"
@@ -132,12 +132,12 @@ export function AdminEmptyState({
   title: string;
 }) {
   return (
-    <section className="rounded-md border border-dashed border-slate-300 bg-white p-6 text-center">
-      <h2 className="text-base font-bold text-slate-950">{title}</h2>
+    <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm">
+      <h2 className="text-base font-black text-slate-950">{title}</h2>
       <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">{description}</p>
       {actionHref && actionLabel ? (
         <Link
-          className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-teal-800"
           href={actionHref}
         >
           {actionLabel}
@@ -159,7 +159,7 @@ export function AdminPageHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h2 className="text-xl font-bold text-slate-950">{title}</h2>
+        <h2 className="text-2xl font-black text-slate-950">{title}</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
@@ -177,7 +177,7 @@ export function AdminMetricCard({
   tone?: BadgeTone;
 }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <p className="text-sm font-medium text-slate-500">{label}</p>
       <p className={clsx("mt-2 text-2xl font-bold", metricToneClasses[tone])}>
         {value.toLocaleString("vi-VN")}

@@ -10,6 +10,8 @@ export type Profile = {
   status: UserStatus;
   avatar_url: string | null;
   public_slug: string;
+  landlord_zalo_group_url: string | null;
+  landlord_zalo_group_name: string | null;
   created_at: string;
   updated_at: string;
 };

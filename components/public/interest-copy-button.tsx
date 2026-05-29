@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 
+const SUCCESS_MESSAGE = "Đã ghi nhận quan tâm. Môi giới sẽ liên hệ/xác nhận lại.";
+const ERROR_MESSAGE = "Chưa gửi được thông tin quan tâm. Vui lòng thử lại.";
+
 export function InterestCopyButton({
   packageSlug,
   roomId,
@@ -17,13 +20,16 @@ export function InterestCopyButton({
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    setSent(window.localStorage.getItem(storageKey) === "sent");
+    if (window.localStorage.getItem(storageKey) === "sent") {
+      setSent(true);
+      setMessage(SUCCESS_MESSAGE);
+    }
   }, [storageKey]);
 
   return (
     <div className="space-y-2">
       <button
-        className="inline-flex h-11 w-full items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
+        className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[#0F5FD7] px-4 text-sm font-bold text-white hover:bg-[#0B4FB5] disabled:cursor-not-allowed disabled:bg-[#CBD5E1] disabled:text-slate-600"
         disabled={sent || isPending}
         onClick={() => {
           startTransition(async () => {
@@ -38,30 +44,30 @@ export function InterestCopyButton({
               const result = (await response.json()) as { error?: string; ok?: boolean };
 
               if (!result.ok) {
-                setMessage(result.error ?? "Chưa gửi được thông tin quan tâm. Vui lòng thử lại.");
+                setMessage(result.error ?? ERROR_MESSAGE);
                 return;
               }
 
               try {
                 await navigator.clipboard.writeText(text);
               } catch {
-                // Clipboard copy is only a convenience; the broker notification was already recorded.
+                // Copying is only a convenience; the in-app interest event was already recorded.
               }
 
               window.localStorage.setItem(storageKey, "sent");
               setSent(true);
-              setMessage("Đã gửi thông tin cho môi giới. Môi giới sẽ liên hệ bạn sớm.");
+              setMessage(SUCCESS_MESSAGE);
             } catch {
-              setMessage("Chưa gửi được thông tin quan tâm. Vui lòng thử lại.");
+              setMessage(ERROR_MESSAGE);
             }
           });
         }}
         type="button"
       >
-        {sent ? "Đã gửi quan tâm" : isPending ? "Đang gửi..." : "Tôi quan tâm phòng này"}
+        {sent ? "Đã quan tâm" : isPending ? "Đang gửi..." : "Tôi quan tâm phòng này"}
       </button>
       {message ? (
-        <p className={sent ? "text-xs font-medium text-teal-700" : "text-xs font-medium text-rose-700"}>
+        <p className={sent ? "text-xs font-medium text-[#047857]" : "text-xs font-medium text-[#B91C1C]"}>
           {message}
         </p>
       ) : null}

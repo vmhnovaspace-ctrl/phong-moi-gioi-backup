@@ -50,13 +50,13 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
       <FormError message={state.error} />
 
       {building ? (
-        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800">
+        <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-sm font-bold text-[#0B3B82]">
           Tạo phòng trong căn: {building.name}
         </div>
       ) : null}
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Thông tin chính</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Thông tin cơ bản</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <TextField defaultValue={room?.room_code} label="Mã phòng" name="room_code" required />
           <TextField defaultValue={room?.title ?? ""} label="Tiêu đề" name="title" />
@@ -69,7 +69,7 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
           <label className="block">
             <span className="text-sm font-medium text-slate-800">Trạng thái</span>
             <select
-              className="mt-2 h-12 w-full rounded-md border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+              className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
               defaultValue={room?.status ?? "available"}
               name="status"
             >
@@ -85,8 +85,8 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Phí</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Giá / cọc / phí</h2>
         {activeBuildingFees ? (
           <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
             <p className="text-sm font-semibold text-slate-900">Phí chung hiện tại</p>
@@ -131,8 +131,8 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Tiện ích</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Tiện ích</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {featureFields.map((field) => (
             <label
@@ -140,7 +140,7 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
               key={field.name}
             >
               <input
-                className="size-5 rounded border-slate-300 text-teal-700 focus:ring-teal-700"
+                className="size-5 rounded border-slate-300 text-[#0F5FD7] focus:ring-[#93C5FD]"
                 defaultChecked={features?.[field.name] ?? false}
                 name={field.name}
                 type="checkbox"
@@ -151,8 +151,8 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Ảnh phòng</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Ảnh / link Drive</h2>
         <div className="mt-4 grid gap-4">
           <TextField
             defaultValue={room?.room_drive_folder_url ?? ""}
@@ -163,7 +163,7 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
           <label className="block">
             <span className="text-sm font-medium text-slate-800">Link từng ảnh</span>
             <textarea
-              className="mt-2 min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+              className="mt-2 min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
               name="image_links"
               placeholder="Dán mỗi link một dòng hoặc cách nhau bằng dấu phẩy"
             />
@@ -184,8 +184,8 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Mô tả</h2>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Trạng thái / ghi chú</h2>
         <div className="mt-4 grid gap-4">
           <TextArea defaultValue={room?.description ?? ""} label="Mô tả" name="description" />
           <TextArea defaultValue={room?.strengths ?? ""} label="Điểm mạnh" name="strengths" />
@@ -204,7 +204,7 @@ function FormError({ message }: { message?: string }) {
   }
 
   return (
-    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
       {message}
     </div>
   );
@@ -215,7 +215,7 @@ function SubmitButton({ label }: { label: string }) {
 
   return (
     <button
-      className="flex h-12 w-full items-center justify-center rounded-md bg-teal-700 px-5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400 sm:w-auto"
+      className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#0F5FD7] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#0B4FB5] disabled:cursor-not-allowed disabled:bg-[#94A3B8] sm:w-auto"
       disabled={pending}
       type="submit"
     >
@@ -241,7 +241,7 @@ function TextField({
     <label className="block">
       <span className="text-sm font-medium text-slate-800">{label}</span>
       <input
-        className="mt-2 h-12 w-full rounded-md border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+        className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         defaultValue={defaultValue ?? ""}
         name={name}
         required={required}
@@ -269,7 +269,7 @@ function NumberField({
   return (
     <label className="block">
       <span className="text-sm font-medium text-slate-800">{label}</span>
-      <div className="mt-2 flex overflow-hidden rounded-md border border-slate-300 bg-white focus-within:border-teal-700 focus-within:ring-2 focus-within:ring-teal-100">
+      <div className="mt-2 flex overflow-hidden rounded-xl border border-slate-300 bg-white focus-within:border-[#0F5FD7] focus-within:ring-2 focus-within:ring-[#93C5FD]">
         <input
           className="h-12 min-w-0 flex-1 px-3 text-base outline-none"
           defaultValue={defaultValue ?? ""}
@@ -302,7 +302,7 @@ function TextArea({
     <label className="block">
       <span className="text-sm font-medium text-slate-800">{label}</span>
       <textarea
-        className="mt-2 min-h-28 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
+        className="mt-2 min-h-28 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         defaultValue={defaultValue ?? ""}
         name={name}
       />

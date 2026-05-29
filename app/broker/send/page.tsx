@@ -6,5 +6,12 @@ export default async function BrokerSendPage() {
   const profile = await requireRole(["broker"]);
   const data = await getBrokerSendToCustomerData(profile.id);
 
-  return <BrokerSendToCustomerView packages={data.packages} rooms={data.rooms} />;
+  return (
+    <BrokerSendToCustomerView
+      customerInterestEvents={data.customer_interest_events}
+      packages={data.packages}
+      rooms={data.rooms}
+      unreadCustomerInterestCount={data.unread_customer_interest_count}
+    />
+  );
 }

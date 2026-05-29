@@ -3,19 +3,20 @@ import { roomStatusLabels } from "@/lib/landlord/format";
 import type { RoomStatus } from "@/lib/landlord/types";
 
 const statusClasses: Record<RoomStatus, string> = {
-  available: "border-green-200 bg-green-50 text-green-700",
-  coming_soon: "border-blue-200 bg-blue-50 text-blue-700",
-  reserved: "border-amber-200 bg-amber-50 text-amber-700",
-  rented: "border-slate-200 bg-slate-100 text-slate-600",
-  hidden: "border-slate-300 bg-slate-800 text-white"
+  available: "border-[#A7F3D0] bg-[#ECFDF5] text-[#047857]",
+  coming_soon: "border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]",
+  reserved: "border-[#FDE68A] bg-[#FFFBEB] text-[#B45309]",
+  rented: "border-[#CBD5E1] bg-[#F1F5F9] text-[#475569]",
+  hidden: "border-[#CBD5E1] bg-[#F8FAFC] text-[#64748B]"
 };
 
-export function StatusBadge({ status }: { status: RoomStatus }) {
+export function StatusBadge({ className, status }: { className?: string; status: RoomStatus }) {
   return (
     <span
       className={clsx(
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
-        statusClasses[status]
+        "inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-xs font-bold leading-none",
+        statusClasses[status],
+        className
       )}
     >
       {roomStatusLabels[status]}

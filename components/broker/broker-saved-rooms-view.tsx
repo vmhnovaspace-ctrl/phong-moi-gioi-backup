@@ -70,7 +70,7 @@ export function BrokerSavedRoomsView({ rooms }: BrokerSavedRoomsViewProps) {
         <section className="grid gap-3">
           {filteredRooms.map((room) => (
             <article
-              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-teal-200 hover:shadow-md"
+              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-[#BFDBFE] hover:shadow-md"
               key={room.id}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -78,7 +78,7 @@ export function BrokerSavedRoomsView({ rooms }: BrokerSavedRoomsViewProps) {
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge status={room.status} />
                     {room.commission ? (
-                      <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">
+                      <span className="rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1 text-xs font-semibold text-[#0F5FD7]">
                         HH {room.commission}
                       </span>
                     ) : null}
@@ -100,7 +100,7 @@ export function BrokerSavedRoomsView({ rooms }: BrokerSavedRoomsViewProps) {
 
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <Link
-                    className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"
+                    className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
                     href={`/broker/rooms/${room.id}`}
                   >
                     Chi tiết
@@ -143,7 +143,7 @@ function EmptyState() {
         Mở kho phòng và theo dõi những phòng cần xử lý để xem nhanh tại đây.
       </p>
       <Link
-        className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+        className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-[#0F5FD7] px-4 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
         href="/broker/rooms"
       >
         Mở kho phòng

@@ -32,7 +32,7 @@ export function CopyTextButton({
   return (
     <button
       className={clsx(
-        "inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50",
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#BFDBFE] bg-white px-3 text-sm font-bold text-[#0F5FD7] hover:bg-[#EFF6FF]",
         className
       )}
       onClick={copyText}

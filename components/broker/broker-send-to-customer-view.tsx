@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  Bell,
+  CheckCircle2,
   Copy,
   ExternalLink,
   ImageIcon,
@@ -14,10 +17,15 @@ import {
   Sparkles,
   Trash2
 } from "lucide-react";
+import { markCustomerInterestEventRead } from "@/app/broker/actions";
 import {
   hideCustomerRoomPackage,
   type CreateCustomerRoomPackageResult
 } from "@/app/broker/send/actions";
+import {
+  rankCustomerNeedRooms,
+  type CustomerNeedRoomMatch
+} from "@/lib/broker/customer-needs-parser";
 import {
   matchesBrokerRoomSmartSearch,
   normalizeBrokerSearchText,
@@ -26,6 +34,7 @@ import {
 import type {
   BrokerInventoryFilters,
   BrokerInventoryRoom,
+  CustomerRoomPackageEvent,
   CustomerRoomPackageSummary
 } from "@/lib/broker/types";
 import {
@@ -35,11 +44,13 @@ import {
 import { formatArea, formatCurrencyVnd } from "@/lib/landlord/format";
 import { getHcmcDistricts, getHcmcWards } from "@/lib/vietnam-hcmc-locations";
 import { CURRENT_ADMIN_UNIT_OPTIONS } from "@/src/lib/location-options";
-import { getCurrentAdminUnitByValue, matchesLocationFilter } from "@/src/lib/location-utils";
+import { matchesLocationFilter } from "@/src/lib/location-utils";
 
 type BrokerSendToCustomerViewProps = {
+  customerInterestEvents: CustomerRoomPackageEvent[];
   packages: CustomerRoomPackageSummary[];
   rooms: BrokerInventoryRoom[];
+  unreadCustomerInterestCount: number;
 };
 
 type CreatedPackageResult = Extract<CreateCustomerRoomPackageResult, { ok: true }>;
@@ -51,29 +62,19 @@ type CustomerFormState = {
   customerZaloLink: string;
 };
 
-type MatchedRoom = BrokerInventoryRoom & {
-  score: number;
-};
+type MatchedRoom = CustomerNeedRoomMatch;
 
 type SelectOption = {
   label: string;
   value: string;
 };
 
-const featureKeywords = [
-  { keys: ["thang may", "thang máy", "elevator"], feature: "has_elevator" },
-  { keys: ["ban cong", "ban công"], feature: "has_balcony" },
-  { keys: ["cua so", "cửa sổ"], feature: "has_window" },
-  { keys: ["noi that", "nội thất", "full"], feature: "is_furnished" },
-  { keys: ["may lanh", "máy lạnh", "dieu hoa", "điều hòa"], feature: "has_air_conditioner" },
-  { keys: ["tu lanh", "tủ lạnh"], feature: "has_fridge" },
-  { keys: ["bep rieng", "bếp riêng"], feature: "has_private_kitchen" },
-  { keys: ["wc rieng", "wc riêng", "ve sinh rieng", "vệ sinh riêng"], feature: "has_private_bathroom" },
-  { keys: ["may giat", "máy giặt"], feature: "has_washing_machine" },
-  { keys: ["giu xe", "giữ xe", "de xe", "để xe"], feature: "has_parking" }
-] as const;
-
-export function BrokerSendToCustomerView({ packages, rooms }: BrokerSendToCustomerViewProps) {
+export function BrokerSendToCustomerView({
+  customerInterestEvents,
+  packages,
+  rooms,
+  unreadCustomerInterestCount
+}: BrokerSendToCustomerViewProps) {
   const [form, setForm] = useState<CustomerFormState>({
     customerName: "",
     customerNeed: "",
@@ -96,13 +97,15 @@ export function BrokerSendToCustomerView({ packages, rooms }: BrokerSendToCustom
     () => rooms.filter((room) => filterSendRoom(room, filters)),
     [filters, rooms]
   );
-  const matchedRooms = useMemo(
-    () => matchRoomsByNeed(filteredRooms, form.customerNeed),
+  const rankedRooms = useMemo(
+    () => rankCustomerNeedRooms(filteredRooms, form.customerNeed),
     [filteredRooms, form.customerNeed]
   );
+  const matchedRooms = rankedRooms.matches;
+  const parsedNeed = rankedRooms.parsed;
   const visibleRooms = hasSearched
     ? matchedRooms
-    : filteredRooms.slice(0, 8).map((room) => ({ ...room, score: 0 }));
+    : filteredRooms.slice(0, 8).map(toSuggestedRoom);
   const overLimit = selectedRoomIds.length > 5;
 
   function updateField(key: keyof CustomerFormState, value: string) {
@@ -180,6 +183,8 @@ export function BrokerSendToCustomerView({ packages, rooms }: BrokerSendToCustom
         filters={filters}
         form={form}
         matchedCount={matchedRooms.length}
+        needChips={parsedNeed.chips}
+        needsFallbackKeyword={Boolean(form.customerNeed.trim()) && !parsedNeed.hasStructuredCriteria}
         onSearch={() => {
           setHasSearched(true);
           setSelectedRoomIds([]);
@@ -195,6 +200,11 @@ export function BrokerSendToCustomerView({ packages, rooms }: BrokerSendToCustom
       />
 
       {result ? <SuccessPanel copyText={copyText} result={result} /> : null}
+
+      <CustomerInterestPanel
+        events={customerInterestEvents}
+        unreadCount={unreadCustomerInterestCount}
+      />
 
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-3">
@@ -243,7 +253,7 @@ export function BrokerSendToCustomerView({ packages, rooms }: BrokerSendToCustom
               ) : null}
             </div>
             <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#0F5FD7] px-4 text-sm font-semibold text-white hover:bg-[#0B4FB5] disabled:opacity-60"
               disabled={isPending || overLimit || selectedRoomIds.length < 1}
               onClick={createPackage}
               type="button"
@@ -269,6 +279,8 @@ function SendCustomerSearchCard({
   filters,
   form,
   matchedCount,
+  needChips,
+  needsFallbackKeyword,
   onSearch,
   onToggleAdvanced,
   resetFilters,
@@ -281,6 +293,8 @@ function SendCustomerSearchCard({
   filters: BrokerInventoryFilters;
   form: CustomerFormState;
   matchedCount: number;
+  needChips: string[];
+  needsFallbackKeyword: boolean;
   onSearch: () => void;
   onToggleAdvanced: () => void;
   resetFilters: () => void;
@@ -291,22 +305,20 @@ function SendCustomerSearchCard({
 }) {
   const boundaryMode = filters.boundaryMode ?? "old";
   const isCurrentMode = boundaryMode === "new";
-  const district = isCurrentMode ? "" : filters.district ?? "";
+  const district = filters.district ?? "";
   const ward = filters.ward ?? "";
   const districts = useMemo(() => toSelectOptions(getHcmcDistricts("old")), []);
   const wards = useMemo(
     () => isCurrentMode ? CURRENT_ADMIN_UNIT_OPTIONS : toSelectOptions(getHcmcWards("old", district)),
     [district, isCurrentMode]
   );
-  const chips = buildNeedChips(form.customerNeed, filters);
-
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div>
         <div>
-          <h2 className="text-xl font-bold text-slate-950">Gửi khách</h2>
+          <h2 className="text-xl font-bold text-slate-950">Tìm phòng và Gửi khách</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-            Gộp nhu cầu khách và lọc phòng vào một luồng, tránh bị trùng nút tìm phòng.
+            Nhập nhanh nhu cầu khách, hệ thống sẽ hiểu điều kiện chính và xếp phòng phù hợp lên trước.
           </p>
         </div>
       </div>
@@ -332,10 +344,10 @@ function SendCustomerSearchCard({
         />
       </div>
 
-      <div className="mt-5 rounded-lg border border-indigo-100 bg-indigo-50/60 p-4">
+      <div className="mt-5 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="size-5 text-indigo-700" aria-hidden />
+            <Sparkles className="size-5 text-[#0F5FD7]" aria-hidden />
             <h3 className="font-bold text-slate-950">Tìm phòng theo nhu cầu</h3>
           </div>
           <p className="shrink-0 text-sm font-semibold text-slate-600">
@@ -344,34 +356,41 @@ function SendCustomerSearchCard({
         </div>
 
         <textarea
-          className="mt-3 min-h-24 w-full rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+          className="mt-3 min-h-24 w-full rounded-md border border-[#BFDBFE] bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
           onChange={(event) => updateField("customerNeed", event.target.value)}
-          placeholder="Ví dụ: Khách cần phòng ban công Tân Bình, dưới 8 triệu, 2 người, có nội thất, ưu tiên gần Nhất Chi Mai."
+          placeholder="Ví dụ: 20m2 8tr Tân Bình có thang máy, full nội thất"
           value={form.customerNeed}
         />
 
-        {chips.length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {chips.map((chip) => (
+        {needChips.length > 0 ? (
+          <div className="mt-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Đã hiểu nhu cầu</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {needChips.map((chip) => (
               <button
-                className="h-9 rounded-full border border-teal-200 bg-white px-3 text-sm font-semibold text-teal-800"
+                className="h-9 rounded-full border border-[#BFDBFE] bg-white px-3 text-sm font-semibold text-[#0B3B82]"
                 key={chip}
                 type="button"
               >
                 {chip}
               </button>
-            ))}
+              ))}
+            </div>
           </div>
+        ) : null}
+        {needsFallbackKeyword ? (
+          <p className="mt-3 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-800">
+            Chưa nhận diện được điều kiện cụ thể, đang tìm theo từ khóa.
+          </p>
         ) : null}
       </div>
 
       <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_auto] lg:items-end">
         <SelectInput
-          disabled={isCurrentMode}
           label="Quận/Khu vực"
           onChange={(value) => updateFilters({ district: value || undefined, ward: undefined })}
           options={districts}
-          placeholder={isCurrentMode ? "Không dùng trong địa giới hiện hành" : "Tất cả"}
+          placeholder="Tất cả"
           value={district}
         />
         <NumberInput
@@ -384,7 +403,7 @@ function SendCustomerSearchCard({
         <label className="space-y-1.5">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</span>
           <select
-            className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
             onChange={(event) =>
               updateFilters({
                 status:
@@ -401,7 +420,7 @@ function SendCustomerSearchCard({
           </select>
         </label>
         <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#BFDBFE] bg-white px-4 text-sm font-semibold text-[#0F5FD7] hover:bg-[#EFF6FF]"
           onClick={onToggleAdvanced}
           type="button"
         >
@@ -415,7 +434,7 @@ function SendCustomerSearchCard({
           <label className="space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Kiểu địa giới</span>
             <select
-              className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
               onChange={(event) =>
                 updateFilters({
                   boundaryMode: event.target.value === "new" ? "new" : "old",
@@ -430,7 +449,6 @@ function SendCustomerSearchCard({
             </select>
           </label>
           <SelectInput
-            disabled={!isCurrentMode && !district}
             label="Phường"
             onChange={(value) => updateFilters({ ward: value || undefined })}
             options={wards}
@@ -485,7 +503,7 @@ function SendCustomerSearchCard({
 
       <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#D8E2F0] bg-white px-4 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]"
           onClick={resetFilters}
           type="button"
         >
@@ -497,7 +515,7 @@ function SendCustomerSearchCard({
             {matchedCount}/{totalCount} phòng phù hợp
           </p>
           <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#0F5FD7] px-4 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
             onClick={onSearch}
             type="button"
           >
@@ -542,7 +560,7 @@ function SendRoomCard({
           )}
           <input
             checked={checked}
-            className="absolute left-3 top-3 size-5 accent-teal-700"
+            className="absolute left-3 top-3 size-5 accent-[#0F5FD7]"
             onChange={onToggle}
             type="checkbox"
           />
@@ -577,6 +595,23 @@ function SendRoomCard({
               ))}
             </div>
           ) : null}
+          {room.matchReasons.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {room.matchReasons.slice(0, 4).map((reason) => (
+                <span
+                  className="rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1 text-xs font-semibold text-[#0B3B82]"
+                  key={reason}
+                >
+                  {reason}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {room.score > 0 ? (
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Điểm phù hợp: {room.score}
+            </p>
+          ) : null}
         </div>
       </label>
     </article>
@@ -598,7 +633,7 @@ function TextInput({
     <label className="space-y-1.5">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
       <input
-        className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         value={value}
@@ -626,7 +661,7 @@ function SelectInput({
     <label className="space-y-1.5">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
       <select
-        className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         value={value}
@@ -655,17 +690,35 @@ function NumberInput({
   placeholder: string;
   value?: number;
 }) {
+  const [draft, setDraft] = useState(formatNumberInputValue(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) {
+      setDraft(formatNumberInputValue(value));
+    }
+  }, [focused, value]);
+
   return (
     <label className="space-y-1.5">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
       <input
-        className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
         inputMode={mode === "decimal" ? "decimal" : "numeric"}
         min={0}
-        onChange={(event) => onChange(numberFromInput(event.target.value, mode))}
+        onBlur={() => {
+          setFocused(false);
+          setDraft(formatNumberInputValue(value));
+        }}
+        onChange={(event) => {
+          const nextDraft = event.target.value;
+          setDraft(nextDraft);
+          onChange(numberFromInput(nextDraft, mode));
+        }}
+        onFocus={() => setFocused(true)}
         placeholder={placeholder}
         type="text"
-        value={value ?? ""}
+        value={draft}
       />
     </label>
   );
@@ -684,7 +737,7 @@ function CheckboxPill({
     <label className="flex h-11 cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
       <input
         checked={checked}
-        className="size-4 accent-teal-700"
+        className="size-4 accent-[#0F5FD7]"
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"
       />
@@ -701,9 +754,9 @@ function SuccessPanel({
   result: CreatedPackageResult;
 }) {
   return (
-    <section className="rounded-lg border border-teal-200 bg-teal-50 p-4">
+    <section className="rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] p-4">
       <h3 className="text-base font-bold text-slate-950">Đã tạo gói gửi khách</h3>
-      <div className="mt-3 rounded-md border border-teal-200 bg-white p-3 text-sm font-semibold text-teal-800">
+      <div className="mt-3 rounded-md border border-[#BFDBFE] bg-white p-3 text-sm font-semibold text-[#0B3B82]">
         {result.packageUrl}
       </div>
       <pre className="mt-3 whitespace-pre-wrap rounded-md border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700">
@@ -711,7 +764,7 @@ function SuccessPanel({
       </pre>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <button
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
           onClick={() => copyText(result.message, "Đã copy tin nhắn Zalo.")}
           type="button"
         >
@@ -784,7 +837,7 @@ function ZaloSendButton({
 
   return (
     <button
-      className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+      className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
       onClick={async () => {
         const resolvedMessage = typeof message === "function" ? message() : message;
         await copyText(resolvedMessage, "Đã copy tin nhắn. Đang mở Zalo khách.");
@@ -795,6 +848,100 @@ function ZaloSendButton({
       <Send className="size-4" aria-hidden />
       Gửi Zalo
     </button>
+  );
+}
+
+function CustomerInterestPanel({
+  events,
+  unreadCount
+}: {
+  events: CustomerRoomPackageEvent[];
+  unreadCount: number;
+}) {
+  const router = useRouter();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-2">
+          <Bell className="mt-0.5 size-5 text-amber-700" aria-hidden />
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-bold text-slate-950">Khách quan tâm</h3>
+              {unreadCount > 0 ? (
+                <span className="rounded-full bg-amber-200 px-2.5 py-1 text-xs font-black text-amber-900">
+                  {unreadCount} mới
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 text-sm leading-6 text-amber-900">
+              Khi khách bấm “Tôi quan tâm phòng này”, danh sách sẽ cập nhật từ database và realtime.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {events.length > 0 ? (
+        <div className="mt-3 grid gap-2">
+          {events.map((event) => (
+            <article
+              className={event.is_read
+                ? "rounded-md border border-amber-100 bg-white/80 p-3"
+                : "rounded-md border border-amber-300 bg-white p-3 shadow-sm"}
+              key={event.id}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-slate-950">
+                    {event.customer_name ? `Khách ${event.customer_name}` : "Khách"} quan tâm {roomLabel(event)}
+                  </p>
+                  {event.customer_phone ? (
+                    <p className="mt-1 text-sm font-semibold text-slate-700">SĐT/Zalo: {event.customer_phone}</p>
+                  ) : null}
+                  {event.customer_need ? (
+                    <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">Nhu cầu: {event.customer_need}</p>
+                  ) : null}
+                  <p className="mt-1 text-xs text-slate-400">{formatEventTime(event.created_at)}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    href={`/p/${event.package_public_slug}`}
+                    target="_blank"
+                  >
+                    Mở gói
+                  </Link>
+                  {!event.is_read ? (
+                    <button
+                      className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-[#0F5FD7] px-3 text-xs font-bold text-white hover:bg-[#0B4FB5] disabled:opacity-60"
+                      disabled={isPending && pendingId === event.id}
+                      onClick={() => {
+                        setPendingId(event.id);
+                        startTransition(async () => {
+                          await markCustomerInterestEventRead(event.id);
+                          setPendingId(null);
+                          router.refresh();
+                        });
+                      }}
+                      type="button"
+                    >
+                      <CheckCircle2 className="size-3.5" aria-hidden />
+                      Đã xử lý
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-md border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-amber-900">
+          Chưa có khách quan tâm từ các gói đã gửi.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -847,7 +994,7 @@ function RecentPackages({
                   }
                 />
                 <button
-                  className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"
+                  className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
                   onClick={() => {
                     const packageUrl = `${window.location.origin}/p/${item.public_slug}`;
                     copyText(buildZaloMessage(item.customer_name, packageUrl), "Đã copy lại tin nhắn.");
@@ -909,7 +1056,7 @@ function ImageBadge({ hasDrive, hasImage }: { hasDrive: boolean; hasImage: boole
 function Badge({ children, tone }: { children: React.ReactNode; tone: "amber" | "blue" | "green" }) {
   const className = {
     amber: "border-amber-200 bg-amber-50 text-amber-700",
-    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    blue: "border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]",
     green: "border-emerald-200 bg-emerald-50 text-emerald-700"
   }[tone];
 
@@ -920,43 +1067,13 @@ function Badge({ children, tone }: { children: React.ReactNode; tone: "amber" | 
   );
 }
 
-function buildNeedChips(need: string, filters: BrokerInventoryFilters) {
-  const normalizedNeed = normalizeBrokerSearchText(need);
-  const chips = new Set<string>();
-
-  if (filters.boundaryMode === "new" && filters.ward) {
-    chips.add(getCurrentAdminUnitByValue(filters.ward)?.label ?? filters.ward);
-  } else if (filters.district) {
-    chips.add(filters.district);
-  }
-
-  if (filters.maxPrice) {
-    chips.add(`Dưới ${formatCompactPrice(filters.maxPrice)}`);
-  }
-
-  if (filters.furnished || normalizedNeed.includes("noi that")) {
-    chips.add("Có nội thất");
-  }
-
-  const peopleMatch = normalizedNeed.match(/\b(\d+)\s*(nguoi|ng)\b/);
-  if (peopleMatch?.[1]) {
-    chips.add(`${peopleMatch[1]} người`);
-  }
-
-  if (normalizedNeed.includes("ban cong")) {
-    chips.add("Ban công");
-  }
-
-  return Array.from(chips).slice(0, 5);
-}
-
 function cleanFilters(filters: BrokerInventoryFilters): BrokerInventoryFilters {
   const boundaryMode = filters.boundaryMode ?? "old";
 
   return {
     allowsPet: filters.allowsPet || undefined,
     boundaryMode,
-    district: boundaryMode === "new" ? undefined : filters.district?.trim() || undefined,
+    district: filters.district?.trim() || undefined,
     furnished: filters.furnished || undefined,
     landlord: filters.landlord?.trim() || undefined,
     maxArea: filters.maxArea,
@@ -1058,97 +1175,30 @@ function numberFromInput(value: string, mode: "decimal" | "money") {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-function matchRoomsByNeed(rooms: BrokerInventoryRoom[], need: string): MatchedRoom[] {
-  const normalizedNeed = normalizeBrokerSearchText(need);
-  const maxPrice = parseMaxPrice(normalizedNeed);
-  const requiredFeatures = featureKeywords
-    .filter((item) => item.keys.some((key) => normalizedNeed.includes(normalizeBrokerSearchText(key))))
-    .map((item) => item.feature);
-
-  return rooms
-    .map((room) => {
-      let score = 0;
-      const haystack = normalizeBrokerSearchText(
-        [
-          room.building.address,
-          room.building.ward,
-          room.building.district,
-          room.title,
-          room.description,
-          room.strengths
-        ].join(" ")
-      );
-
-      if (normalizedNeed && haystack.includes(normalizedNeed)) {
-        score += 10;
-      }
-
-      for (const token of normalizedNeed.split(" ").filter((part) => part.length >= 3)) {
-        if (haystack.includes(token)) {
-          score += 2;
-        }
-      }
-
-      if (maxPrice && room.rent_price <= maxPrice) {
-        score += 8;
-      }
-
-      if (maxPrice && room.rent_price > maxPrice) {
-        score -= 20;
-      }
-
-      for (const feature of requiredFeatures) {
-        if (room.features?.[feature]) {
-          score += 5;
-        } else {
-          score -= 4;
-        }
-      }
-
-      if (room.status === "available") {
-        score += 3;
-      }
-
-      if (room.cover_image_url || room.thumbnail?.image_url || room.room_drive_folder_url) {
-        score += 2;
-      }
-
-      return { ...room, score };
-    })
-    .filter((room) => {
-      if (!normalizedNeed) {
-        return true;
-      }
-
-      return room.score > 0;
-    })
-    .sort((a, b) => b.score - a.score || a.rent_price - b.rent_price)
-    .slice(0, 30);
+function formatNumberInputValue(value?: number) {
+  return value === undefined ? "" : String(value);
 }
 
-function parseMaxPrice(normalizedNeed: string) {
-  const millionMatch = normalizedNeed.match(/(?:duoi|toi da|khong qua|<=|<)?\s*(\d+(?:[,.]\d+)?)\s*(?:tr|trieu)/);
-
-  if (millionMatch?.[1]) {
-    return Math.round(Number(millionMatch[1].replace(",", ".")) * 1_000_000);
-  }
-
-  const rawMatch = normalizedNeed.match(/(?:duoi|toi da|khong qua|<=|<)?\s*(\d{7,9})/);
-
-  if (rawMatch?.[1]) {
-    return Number(rawMatch[1]);
-  }
-
-  return null;
+function toSuggestedRoom(room: BrokerInventoryRoom): MatchedRoom {
+  return {
+    ...room,
+    matchLevel: "near",
+    matchReasons: [],
+    score: 0
+  };
 }
 
-function formatCompactPrice(value: number) {
-  if (value >= 1_000_000) {
-    const millions = value / 1_000_000;
-    return `${Number.isInteger(millions) ? millions : millions.toFixed(1)} triệu`;
-  }
+function roomLabel(event: CustomerRoomPackageEvent) {
+  return event.room_name || (event.room_code ? `Phòng ${event.room_code}` : "một phòng");
+}
 
-  return formatCurrencyVnd(value);
+function formatEventTime(value: string) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit"
+  }).format(new Date(value));
 }
 
 function buildZaloUrl(customerPhone: string | null, customerZaloLink: string | null) {

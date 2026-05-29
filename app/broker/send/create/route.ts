@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const rooms = await Promise.all(roomIds.map((roomId) => getBrokerRoom(roomId, profile.id)));
 
     if (rooms.some((room) => !room)) {
-      return jsonError("Có phòng không còn phù hợp quyền xem của broker.");
+      return jsonError("Có phòng không còn phù hợp quyền xem của môi giới.");
     }
 
     const customerName = cleanText(input.customerName);
@@ -126,11 +126,11 @@ function formatPackageError(message: string) {
     lowerMessage.includes("get_customer_room_package_public") ||
     lowerMessage.includes("schema cache")
   ) {
-    return "Chưa chạy migration Gửi khách. Hãy chạy file supabase/module_06_customer_room_packages.sql trong Supabase SQL Editor rồi thử lại.";
+    return "Chưa tạo được gói gửi khách. Vui lòng thử lại hoặc báo quản trị viên kiểm tra cấu hình dữ liệu.";
   }
 
   if (lowerMessage.includes("row-level security") || lowerMessage.includes("violates row-level security")) {
-    return "Không tạo được gói vì RLS chặn dữ liệu này. Hãy kiểm tra broker đang active và các phòng được chọn thuộc quyền xem của broker.";
+    return "Không tạo được gói vì RLS chặn dữ liệu này. Hãy kiểm tra môi giới đang active và các phòng được chọn thuộc quyền xem của môi giới.";
   }
 
   return message || "Không tạo được gói gửi khách.";

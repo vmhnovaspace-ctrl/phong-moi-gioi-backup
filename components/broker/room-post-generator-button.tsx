@@ -98,10 +98,10 @@ export function RoomPostGeneratorButton({
       <button
         className={
           variant === "primary"
-            ? "inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+            ? "inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#0F5FD7] px-4 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
             : variant === "menu"
               ? "flex h-10 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              : "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-3 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+              : "inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#BFDBFE] bg-white px-3 text-sm font-semibold text-[#0F5FD7] hover:bg-[#EFF6FF]"
         }
         onClick={openModal}
         type="button"
@@ -136,8 +136,8 @@ export function RoomPostGeneratorButton({
                   <button
                     className={
                       channel === item
-                        ? "h-10 whitespace-nowrap rounded-md bg-teal-700 px-3 text-sm font-semibold text-white"
-                        : "h-10 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        ? "h-10 whitespace-nowrap rounded-xl border border-[#0F5FD7] bg-[#0F5FD7] px-3 text-sm font-semibold text-white shadow-sm"
+                        : "h-10 whitespace-nowrap rounded-xl border border-[#D8E2F0] bg-white px-3 text-sm font-semibold text-[#334155] hover:bg-[#EFF6FF] hover:text-[#0F5FD7]"
                     }
                     key={item}
                     onClick={() => changeChannel(item)}
@@ -150,7 +150,7 @@ export function RoomPostGeneratorButton({
 
               <section className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center gap-2">
-                  <ImageIcon className="size-4 text-teal-700" aria-hidden />
+                  <ImageIcon className="size-4 text-[#0F5FD7]" aria-hidden />
                   <h4 className="text-sm font-bold text-slate-950">Ảnh đăng bài</h4>
                 </div>
 
@@ -182,7 +182,7 @@ export function RoomPostGeneratorButton({
                         <button
                           className={
                             (selectedImageUrl ?? images[0].image_url) === image.image_url
-                              ? "overflow-hidden rounded-md border-2 border-teal-600"
+                              ? "overflow-hidden rounded-md border-2 border-[#0F5FD7]"
                               : "overflow-hidden rounded-md border border-slate-200"
                           }
                           key={`${image.image_url}-${index}`}
@@ -204,7 +204,7 @@ export function RoomPostGeneratorButton({
                   <div className="mt-3 flex flex-wrap gap-2">
                     {driveUrls.map((drive) => (
                       <a
-                        className="inline-flex h-10 items-center gap-2 rounded-md border border-teal-200 bg-white px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50"
+                        className="inline-flex h-10 items-center gap-2 rounded-md border border-[#BFDBFE] bg-white px-3 text-sm font-semibold text-[#0B3B82] hover:bg-[#EFF6FF]"
                         href={drive.url}
                         key={drive.url}
                         rel="noreferrer"
@@ -229,7 +229,7 @@ export function RoomPostGeneratorButton({
                   Preview tiêu đề bài đăng
                 </span>
                 <input
-                  className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-950 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                  className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-950 outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
                   onChange={(event) => {
                     setTitle(event.target.value);
                     setIsDirty(true);
@@ -243,7 +243,7 @@ export function RoomPostGeneratorButton({
                   Nội dung bài đăng
                 </span>
                 <textarea
-                  className="min-h-[340px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm leading-6 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                  className="min-h-[340px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm leading-6 outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
                   onChange={(event) => {
                     setBody(event.target.value);
                     setIsDirty(true);
@@ -254,7 +254,7 @@ export function RoomPostGeneratorButton({
 
               <div className="sticky bottom-0 -mx-4 mt-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:flex-row sm:justify-end">
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#D8E2F0] bg-white px-4 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]"
                   onClick={regenerate}
                   type="button"
                 >
@@ -262,7 +262,7 @@ export function RoomPostGeneratorButton({
                   Tạo lại theo mẫu
                 </button>
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-teal-200 bg-teal-50 px-4 text-sm font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#BFDBFE] bg-white px-4 text-sm font-semibold text-[#0F5FD7] hover:bg-[#EFF6FF] disabled:opacity-60"
                   onClick={markPosted}
                   type="button"
                   disabled={isPending}
@@ -271,7 +271,7 @@ export function RoomPostGeneratorButton({
                   {channel === "zalo" ? "Đánh dấu đã gửi khách" : "Đánh dấu đã đăng"}
                 </button>
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#0F5FD7] px-4 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
                   onClick={copyPost}
                   type="button"
                 >

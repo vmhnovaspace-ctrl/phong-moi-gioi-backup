@@ -61,7 +61,7 @@ function ReportFilters({ filters }: { filters: ReturnType<typeof parseAdminRepor
           className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
           defaultValue={filters.q ?? ""}
           name="q"
-          placeholder="Phòng, căn, chủ nhà, broker"
+          placeholder="Phòng, căn, chủ nhà, môi giới"
         />
       </label>
       <label className="space-y-1.5">
@@ -120,7 +120,7 @@ function ReportCard({ report }: { report: AdminReport }) {
               {report.room ? `Phòng ${report.room.room_code}` : "Phòng không còn truy cập được"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              {report.message || "Broker không nhập mô tả thêm."}
+              {report.message || "Môi giới không nhập mô tả thêm."}
             </p>
           </div>
         </div>
@@ -148,8 +148,8 @@ function ReportCard({ report }: { report: AdminReport }) {
         <Info label="Căn nhà" value={report.room?.building?.name ?? "Không rõ căn"} />
         <Info label="Địa chỉ" value={report.room?.building?.address ?? "Không rõ địa chỉ"} />
         <Info label="Chủ nhà" value={report.room?.landlord?.full_name ?? "Không rõ chủ nhà"} />
-        <Info label="Broker gửi" value={report.broker?.full_name ?? "Không rõ broker"} />
-        <Info label="Broker liên hệ" value={report.broker?.phone ?? report.broker?.email ?? "Thiếu liên hệ"} />
+        <Info label="Môi giới gửi" value={report.broker?.full_name ?? "Không rõ môi giới"} />
+        <Info label="Môi giới liên hệ" value={report.broker?.phone ?? report.broker?.email ?? "Thiếu liên hệ"} />
         <Info label="Ngày tạo" value={formatDateTime(report.created_at)} />
         <Info label="Ngày xử lý" value={formatDateTime(report.resolved_at)} />
         <Info label="Admin xử lý" value={report.resolved_by_admin?.full_name ?? "Chưa có"} />

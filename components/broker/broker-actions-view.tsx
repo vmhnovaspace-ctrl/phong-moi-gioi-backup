@@ -54,7 +54,7 @@ export function BrokerActionsView({ rooms }: BrokerActionsViewProps) {
           <button
             className={
               filter === item.value
-                ? "h-10 whitespace-nowrap rounded-full bg-teal-700 px-4 text-sm font-semibold text-white"
+                ? "h-10 whitespace-nowrap rounded-full bg-[#0F5FD7] px-4 text-sm font-semibold text-white"
                 : "h-10 whitespace-nowrap rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             }
             key={item.value}
@@ -104,7 +104,7 @@ function ActionRoomCard({ room }: { room: BrokerActionWorkspaceRoom }) {
   }
 
   return (
-    <article className="relative rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:border-teal-200 hover:shadow-md sm:p-4">
+    <article className="relative rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:border-[#BFDBFE] hover:shadow-md sm:p-4">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -284,7 +284,7 @@ function getImageStatus(room: BrokerActionWorkspaceRoom) {
 
   if (hasDrive(room)) {
     return {
-      className: "rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700",
+      className: "rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]",
       label: "Có Drive"
     };
   }
@@ -312,7 +312,7 @@ function EmptyState() {
         Theo dõi phòng hoặc mở kho phòng để chọn phòng cần đăng/gửi khách.
       </p>
       <Link
-        className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+        className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-[#0F5FD7] px-4 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
         href="/broker/rooms"
       >
         Mở kho phòng

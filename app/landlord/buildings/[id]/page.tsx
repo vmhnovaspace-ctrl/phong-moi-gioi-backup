@@ -2,14 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil, Plus, Send } from "lucide-react";
 import { BuildingFeesForm } from "@/components/landlord/building-fees-form";
+import { BuildingZaloGroupPanel } from "@/components/landlord/building-zalo-group-panel";
 import { EmptyState } from "@/components/landlord/empty-state";
 import { RoomQuickList } from "@/components/landlord/room-quick-list";
-import { CopyLinkButton } from "@/components/share/copy-link-button";
-import { CopyTextButton } from "@/components/share/copy-text-button";
 import { requireRole } from "@/lib/auth/profile";
-import { getSiteUrl } from "@/lib/env";
 import { getLandlordBuildingDetail } from "@/lib/landlord/queries";
-import { buildBuildingShareText } from "@/lib/share/templates";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -30,34 +27,43 @@ export default async function BuildingDetailPage({ params, searchParams }: PageP
 
   const location = [building.ward, building.district, building.city].filter(Boolean).join(", ");
   const duplicatedCodes = query.duplicated?.split(",").filter(Boolean) ?? [];
-  const shareText = buildBuildingShareText(building, getSiteUrl());
 
   return (
     <div className="space-y-5">
       {duplicatedCodes.length > 0 ? (
-        <div className="rounded-md border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-800">
+        <div className="rounded-md border border-[#A7F3D0] bg-[#ECFDF5] p-4 text-sm font-medium text-[#047857]">
           Đã tạo {duplicatedCodes.length} phòng: {duplicatedCodes.join(", ")}
         </div>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        <CopyTextButton label="Copy tin căn" text={shareText} />
-        <CopyLinkButton label="Copy link căn" path={`/b/${building.public_slug}`} />
-        <Link className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50" href="/landlord/buildings">
+        <Link
+          className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+          href="/landlord/buildings"
+        >
           <ArrowLeft className="size-4" aria-hidden />
           Quay lại
         </Link>
-        <Link className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50" href={`/landlord/buildings/${building.id}/edit`}>
+        <Link
+          className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+          href={`/landlord/buildings/${building.id}/edit`}
+        >
           <Pencil className="size-4" aria-hidden />
           Sửa căn nhà
         </Link>
-        <Link className="inline-flex h-11 items-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800" href={`/landlord/buildings/${building.id}/rooms/new`}>
+        <Link
+          className="inline-flex h-11 items-center gap-2 rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
+          href={`/landlord/buildings/${building.id}/rooms/new`}
+        >
           <Plus className="size-4" aria-hidden />
           Thêm phòng
         </Link>
-        <Link className="inline-flex h-11 items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 text-sm font-semibold text-blue-800 hover:bg-blue-100" href={`/landlord/buildings/${building.id}/sell-list`}>
+        <Link
+          className="inline-flex h-11 items-center gap-2 rounded-md border border-blue-300 bg-[#EFF6FF] px-3 text-sm font-semibold text-[#0B3B82] hover:bg-[#EFF6FF]"
+          href={`/landlord/buildings/${building.id}/sell-list`}
+        >
           <Send className="size-4" aria-hidden />
-          Phòng sell
+          Sell phòng
         </Link>
       </div>
 
@@ -78,12 +84,23 @@ export default async function BuildingDetailPage({ params, searchParams }: PageP
         <Info title="Quy định" value={building.house_rules} />
       </section>
 
+      <BuildingZaloGroupPanel
+        buildingId={building.id}
+        groupName={building.zalo_group_name}
+        groupUrl={building.zalo_group_url}
+        landlordGroupName={profile.landlord_zalo_group_name}
+        landlordGroupUrl={profile.landlord_zalo_group_url}
+      />
+
       <section>
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Danh sách phòng</h2>
             <p className="text-sm text-slate-600">
               Sắp xếp theo tầng và mã phòng. Có thể đổi nhanh trạng thái, giá, cọc và ngày trống.
+            </p>
+            <p className="mt-2 rounded-md border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-sm font-medium text-[#0B3B82]">
+              Phòng ‘Đang trống’ hoặc ‘Sắp trống’ sẽ tự xuất hiện trong danh sách Sell phòng cho môi giới.
             </p>
           </div>
         </div>

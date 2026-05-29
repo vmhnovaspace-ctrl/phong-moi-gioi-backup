@@ -6,8 +6,10 @@ import {
   ImageIcon,
   MapPin,
   Ruler,
+  Star,
   WalletCards
 } from "lucide-react";
+import { RoomPostGeneratorButton } from "@/components/broker/room-post-generator-button";
 import { StatusBadge } from "@/components/landlord/status-badge";
 import type { BrokerInventoryRoom } from "@/lib/broker/types";
 import { formatArea, formatCurrencyVnd, formatDate } from "@/lib/landlord/format";
@@ -25,9 +27,9 @@ export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
     .join(" · ");
 
   return (
-    <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:border-teal-200 hover:shadow-md">
-      <div className="grid gap-0 md:grid-cols-[168px_minmax(0,1fr)]">
-        <div className="relative aspect-[4/3] bg-slate-100 md:aspect-auto md:min-h-44">
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-[#BFDBFE] hover:shadow-md">
+      <div className="grid gap-0 md:grid-cols-[184px_minmax(0,1fr)]">
+        <div className="relative aspect-[4/3] bg-slate-100 md:aspect-auto md:min-h-48">
           {thumbnailUrl ? (
             <img
               alt={room.title || `Phòng ${room.room_code}`}
@@ -45,19 +47,20 @@ export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3 p-4">
+        <div className="flex min-w-0 flex-col gap-4 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h5 className="truncate text-base font-bold text-slate-950">
+              <h5 className="truncate text-lg font-black text-slate-950">
                 {room.title || `Phòng ${room.room_code}`}
               </h5>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-600">
                 <Home className="size-4 shrink-0 text-slate-400" aria-hidden />
                 <span className="truncate">{room.building.name}</span>
               </p>
             </div>
             {room.commission ? (
-              <span className="w-fit rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">
+              <span className="inline-flex w-fit items-center gap-1 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1 text-xs font-bold text-[#1D4ED8]">
+                <Star className="size-3.5" aria-hidden />
                 HH {room.commission}
               </span>
             ) : null}
@@ -65,9 +68,9 @@ export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
 
           <div className="grid gap-2 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] sm:items-end">
             <div>
-              <p className="text-xl font-black text-slate-950">{formatCurrencyVnd(room.rent_price)}</p>
+              <p className="text-2xl font-black tabular-nums text-slate-950">{formatCurrencyVnd(room.rent_price)}</p>
               {room.deposit_amount ? (
-                <p className="mt-1 text-sm text-slate-500">Cọc {formatCurrencyVnd(room.deposit_amount)}</p>
+                <p className="mt-1 text-sm font-medium text-slate-500">Cọc {formatCurrencyVnd(room.deposit_amount)}</p>
               ) : null}
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
@@ -92,15 +95,24 @@ export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 text-sm text-slate-500 lg:flex-row lg:items-center lg:justify-between">
-            <p className="truncate">{location || room.building.address}</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 text-sm text-slate-500 lg:flex-row lg:items-center lg:justify-between">
+            <p className="truncate font-medium">{location || room.building.address}</p>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <Link
-                className="inline-flex h-9 items-center justify-center rounded-md bg-teal-700 px-3 text-xs font-semibold text-white hover:bg-teal-800"
+                className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0F5FD7] px-3 text-sm font-bold text-white shadow-sm hover:bg-[#0B4FB5]"
                 href={`/broker/rooms/${room.id}`}
               >
                 Xem chi tiết
               </Link>
+              <RoomPostGeneratorButton
+                input={{
+                  building: room.building,
+                  features: room.features,
+                  images: room.thumbnail ? [room.thumbnail] : [],
+                  room
+                }}
+                label="Copy tin"
+              />
               {room.room_drive_folder_url ? (
                 <ExternalButton href={room.room_drive_folder_url} label="Ảnh Drive" />
               ) : null}
@@ -116,7 +128,7 @@ export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
 function ExternalButton({ href, label }: { href: string; label: string }) {
   return (
     <a
-      className="inline-flex h-9 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+      className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border border-[#BFDBFE] bg-white px-3 text-sm font-bold text-[#0F5FD7] hover:bg-[#EFF6FF]"
       href={href}
       rel="noreferrer"
       target="_blank"
@@ -130,7 +142,7 @@ function ExternalButton({ href, label }: { href: string; label: string }) {
 
 function FeatureChip({ label }: { label: string }) {
   return (
-    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600">
+    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
       {label}
     </span>
   );
@@ -138,7 +150,7 @@ function FeatureChip({ label }: { label: string }) {
 
 function InfoItem({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="flex min-w-0 items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-2">
+    <div className="flex min-w-0 items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2">
       <span className="shrink-0 text-slate-400">{icon}</span>
       <span className="truncate">{label}</span>
     </div>
