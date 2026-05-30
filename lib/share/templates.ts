@@ -451,7 +451,10 @@ function buildingDisplayName(building: LandlordTemplateBuilding) {
 }
 
 function absoluteShareUrl(baseUrl: string, path: string) {
-  const normalizedBase = baseUrl || "http://localhost:3000";
+  const normalizedBase =
+    baseUrl ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "");
 
   try {
     return new URL(path, normalizedBase.endsWith("/") ? normalizedBase : `${normalizedBase}/`).toString();

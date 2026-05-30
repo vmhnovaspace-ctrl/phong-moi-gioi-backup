@@ -1,8 +1,4 @@
-import {
-  matchesBrokerRoomSmartSearch,
-  normalizeBrokerSearchText,
-  parseBrokerRoomSearchQuery
-} from "@/lib/broker/search";
+import { matchesBrokerLandlordSearch } from "@/lib/broker/search";
 import type {
   BrokerDashboard,
   BrokerActionRoom,
@@ -130,6 +126,7 @@ type ActionRoomRow = BrokerRoomActionState & { room_id: string };
 type CustomerPackageRow = Omit<CustomerRoomPackageSummary, "room_count">;
 type CustomerPackageItemCountRow = { package_id: string };
 type CustomerPackageEventRow = CustomerRoomPackageEvent;
+type CustomerInterestRoomRow = Pick<CustomerRoomPackageEvent, "room_id" | "updated_at" | "created_at">;
 
 const BROKER_INVENTORY_SELECT =
   "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at, buildings!inner(id, name, address, ward, district, city, landlord_id, latitude, longitude, formatted_address, google_place_id, google_maps_url), room_features(allows_pet, has_air_conditioner, has_balcony, has_bed, has_elevator, has_fridge, has_washing_machine, has_parking, has_private_bathroom, has_private_kitchen, has_security, has_wardrobe, has_window, is_furnished), room_images(id, image_url, storage_path, source_type, sort_order, is_cover)";
@@ -345,12 +342,13 @@ function filterInventoryRoom(room: BrokerInventoryRoom, filters: BrokerInventory
   }
 
   if (filters.landlord) {
-    const landlordNeedle = normalizeBrokerSearchText(filters.landlord);
-    const landlordHaystack = normalizeBrokerSearchText(
-      `${room.landlord?.full_name ?? ""} ${room.landlord?.phone ?? ""}`
-    );
-
-    if (!landlordHaystack.includes(landlordNeedle)) {
+    if (
+      !matchesBrokerLandlordSearch({
+        input: filters.landlord,
+        landlordName: room.landlord?.full_name,
+        landlordPhone: room.landlord?.phone
+      })
+    ) {
       return false;
     }
   }
@@ -381,7 +379,7 @@ function filterInventoryRoom(room: BrokerInventoryRoom, filters: BrokerInventory
     return false;
   }
 
-  return matchesBrokerRoomSmartSearch(room, parseBrokerRoomSearchQuery(filters.q));
+  return true;
 }
 
 function uniqueSorted(values: Array<string | null>) {
@@ -498,6 +496,42 @@ async function rowsToInventoryRooms(rows: BrokerInventoryRoomRow[]) {
   return rooms.filter((room): room is BrokerInventoryRoom => room !== null);
 }
 
+async function attachBrokerCloseRequests(rooms: BrokerInventoryRoom[], brokerId?: string) {
+  if (!brokerId || rooms.length === 0) {
+    return rooms;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("room_close_requests")
+    .select("id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at")
+    .eq("broker_id", brokerId)
+    .in("room_id", rooms.map((room) => room.id))
+    .order("created_at", { ascending: false })
+    .returns<BrokerRoomCloseRequestRow[]>();
+
+  if (error) {
+    if (isMissingRoomCloseRequestsTable(error)) {
+      return rooms;
+    }
+
+    throw new Error(error.message);
+  }
+
+  const requestByRoomId = new Map<string, BrokerRoomCloseRequestRow>();
+
+  for (const request of data ?? []) {
+    if (!requestByRoomId.has(request.room_id)) {
+      requestByRoomId.set(request.room_id, request);
+    }
+  }
+
+  return rooms.map((room) => ({
+    ...room,
+    close_request: requestByRoomId.get(room.id) ?? null
+  }));
+}
+
 export async function getBrokerDashboard(brokerId: string): Promise<BrokerDashboard> {
   const rows = await fetchBrokerInventoryRows();
   const rooms = await rowsToInventoryRooms(rows);
@@ -518,9 +552,9 @@ export async function getBrokerDashboard(brokerId: string): Promise<BrokerDashbo
   };
 }
 
-export async function getBrokerInventory(filters: BrokerInventoryFilters): Promise<BrokerInventoryResult> {
+export async function getBrokerInventory(filters: BrokerInventoryFilters, brokerId?: string): Promise<BrokerInventoryResult> {
   const rows = await fetchBrokerInventoryRows();
-  const rooms = await rowsToInventoryRooms(rows);
+  const rooms = await attachBrokerCloseRequests(await rowsToInventoryRooms(rows), brokerId);
   const filteredRooms = rooms.filter((room) => filterInventoryRoom(room, filters));
 
   return {
@@ -753,6 +787,76 @@ export async function getBrokerSavedRooms(brokerId: string, limit?: number): Pro
     .sort((a, b) => new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime());
 }
 
+export async function getBrokerHandledCustomerInterestRooms(
+  brokerId: string,
+  limit = 50
+): Promise<BrokerInventoryRoom[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("customer_room_package_events")
+    .select("room_id, created_at, updated_at")
+    .eq("broker_id", brokerId)
+    .eq("is_read", true)
+    .order("updated_at", { ascending: false })
+    .limit(limit)
+    .returns<CustomerInterestRoomRow[]>();
+
+  if (error) {
+    if (isMissingCustomerInterestEventTable(error)) {
+      return [];
+    }
+
+    throw new Error(error.message);
+  }
+
+  const seenRoomIds = new Set<string>();
+  const roomIds = (data ?? [])
+    .map((row) => row.room_id)
+    .filter((roomId) => {
+      if (seenRoomIds.has(roomId)) {
+        return false;
+      }
+
+      seenRoomIds.add(roomId);
+      return true;
+    });
+
+  if (roomIds.length === 0) {
+    return [];
+  }
+
+  let { data: roomsData, error: roomsError } = await supabase
+    .from("rooms")
+    .select(BROKER_INVENTORY_SELECT)
+    .eq("visibility", "visible")
+    .eq("buildings.visibility", "visible")
+    .in("status", ["available", "coming_soon"])
+    .in("id", roomIds)
+    .returns<BrokerInventoryRoomRow[]>();
+
+  if (roomsError && isMissingMapColumnError(roomsError)) {
+    const fallback = await supabase
+      .from("rooms")
+      .select(BROKER_INVENTORY_SELECT_FALLBACK)
+      .eq("visibility", "visible")
+      .eq("buildings.visibility", "visible")
+      .in("status", ["available", "coming_soon"])
+      .in("id", roomIds)
+      .returns<BrokerInventoryRoomRow[]>();
+    roomsData = fallback.data;
+    roomsError = fallback.error;
+  }
+
+  if (roomsError) {
+    throw new Error(roomsError.message);
+  }
+
+  const roomOrder = new Map(roomIds.map((roomId, index) => [roomId, index]));
+  const rooms = await rowsToInventoryRooms(roomsData ?? []);
+
+  return rooms.sort((a, b) => (roomOrder.get(a.id) ?? 0) - (roomOrder.get(b.id) ?? 0));
+}
+
 export async function getBrokerActionRooms(brokerId: string): Promise<BrokerActionRoom[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -951,6 +1055,7 @@ export async function getBrokerCustomerInterestEvents(
       "id, package_id, package_public_slug, room_id, broker_id, customer_name, customer_phone, customer_zalo_link, customer_need, room_code, room_name, house_address, action_type, is_read, created_at, updated_at"
     )
     .eq("broker_id", brokerId)
+    .eq("is_read", false)
     .order("is_read", { ascending: true })
     .order("created_at", { ascending: false })
     .limit(limit)

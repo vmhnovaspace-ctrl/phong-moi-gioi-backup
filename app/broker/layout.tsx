@@ -16,6 +16,7 @@ export default async function BrokerLayout({
       description="Xem phòng trống/sắp trống, lưu phòng, copy tin đăng và báo chốt phòng."
       navItems={[
         { href: "/broker", label: "Kho phòng" },
+        { href: "/broker/following", label: "Phòng theo dõi" },
         {
           badge: unreadCustomerInterestCount,
           href: "/broker/send",

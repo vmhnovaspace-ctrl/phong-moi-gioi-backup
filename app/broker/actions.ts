@@ -45,6 +45,7 @@ function firstRelation<T>(value: T | T[] | null | undefined) {
 
 function revalidateBrokerRoomPaths(roomId: string) {
   revalidatePath("/broker");
+  revalidatePath("/broker/following");
   revalidatePath("/broker/rooms");
   revalidatePath("/broker/saved");
   revalidatePath("/broker/actions");
@@ -54,6 +55,7 @@ function revalidateBrokerRoomPaths(roomId: string) {
 function revalidateBrokerCustomerPaths() {
   revalidatePath("/broker");
   revalidatePath("/broker/actions");
+  revalidatePath("/broker/following");
   revalidatePath("/broker/send");
 }
 
@@ -178,6 +180,38 @@ export async function createRoomCloseRequest(
 
     throw error;
   }
+}
+
+export async function createRoomCloseRequestFromForm(roomId: string) {
+  await createRoomCloseRequest(roomId);
+}
+
+export async function cancelRoomCloseRequest(roomId: string): Promise<BrokerActionResult> {
+  const profile = await requireRole(["broker"]);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("room_close_requests")
+    .update({ status: "cancelled" })
+    .eq("room_id", roomId)
+    .eq("broker_id", profile.id)
+    .eq("status", "pending");
+
+  if (error) {
+    if (isMissingRoomCloseRequestsTable(error)) {
+      return { error: roomCloseRequestsMigrationMessage() };
+    }
+
+    return { error: error.message };
+  }
+
+  revalidateBrokerRoomPaths(roomId);
+  revalidatePath("/landlord/sell-list");
+
+  return { message: "Đã hủy báo chốt phòng." };
+}
+
+export async function cancelRoomCloseRequestFromForm(roomId: string) {
+  await cancelRoomCloseRequest(roomId);
 }
 
 export async function updateBrokerRoomAction(roomId: string, formData: FormData) {

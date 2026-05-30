@@ -1,21 +1,15 @@
 import { Bookmark, CheckCircle2, ClipboardList, Megaphone, Send } from "lucide-react";
 import { updateBrokerRoomAction } from "@/app/broker/actions";
-import { BrokerCloseRequestPanel } from "@/components/broker/broker-close-request-panel";
-import type { BrokerRoomActionState, BrokerRoomCloseRequestState } from "@/lib/broker/types";
-import type { RoomStatus } from "@/lib/landlord/types";
+import type { BrokerRoomActionState } from "@/lib/broker/types";
 
 type BrokerRoomActionsPanelProps = {
   action: BrokerRoomActionState | null;
-  closeRequest: BrokerRoomCloseRequestState | null;
   roomId: string;
-  roomStatus: RoomStatus;
 };
 
 export function BrokerRoomActionsPanel({
   action,
-  closeRequest,
-  roomId,
-  roomStatus
+  roomId
 }: BrokerRoomActionsPanelProps) {
   const formAction = updateBrokerRoomAction.bind(null, roomId);
 
@@ -93,13 +87,6 @@ export function BrokerRoomActionsPanel({
         </button>
       </form>
 
-      <div className="mt-4">
-        <BrokerCloseRequestPanel
-          closeRequest={closeRequest}
-          roomId={roomId}
-          roomStatus={roomStatus}
-        />
-      </div>
     </section>
   );
 }

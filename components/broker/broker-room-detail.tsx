@@ -242,9 +242,7 @@ export function BrokerRoomDetail({ room }: BrokerRoomDetailProps) {
           </Section>
           <BrokerRoomActionsPanel
             action={room.action}
-            closeRequest={room.close_request}
             roomId={room.id}
-            roomStatus={room.status}
           />
           <BrokerRoomReportPanel roomId={room.id} />
 

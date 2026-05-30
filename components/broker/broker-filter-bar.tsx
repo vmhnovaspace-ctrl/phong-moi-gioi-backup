@@ -72,14 +72,8 @@ export function BrokerFilterBar({
         </div>
 
         <fieldset className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
-          <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">Tìm kiếm</legend>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(220px,0.8fr)]">
-            <TextInput
-              defaultValue={filters.q ?? ""}
-              label="Từ khóa thông minh"
-              name="q"
-              placeholder="VD: phòng có ban công, 05 triệu, gần sân bay Tân Sơn Nhất, cho nuôi chó"
-            />
+          <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">Chủ nhà</legend>
+          <div className="grid gap-3 lg:grid-cols-2">
             <TextInput
               defaultValue={filters.landlord ?? ""}
               label="Chủ nhà"

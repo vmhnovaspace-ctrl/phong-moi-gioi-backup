@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   CalendarDays,
+  CheckCircle2,
   ExternalLink,
   Home,
   ImageIcon,
@@ -9,7 +10,7 @@ import {
   Star,
   WalletCards
 } from "lucide-react";
-import { RoomPostGeneratorButton } from "@/components/broker/room-post-generator-button";
+import { cancelRoomCloseRequestFromForm, createRoomCloseRequestFromForm } from "@/app/broker/actions";
 import { StatusBadge } from "@/components/landlord/status-badge";
 import type { BrokerInventoryRoom } from "@/lib/broker/types";
 import { formatArea, formatCurrencyVnd, formatDate } from "@/lib/landlord/format";
@@ -22,14 +23,16 @@ type BrokerRoomCardProps = {
 export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
   const thumbnailUrl = room.cover_image_url || room.thumbnail?.image_url;
   const mapUrl = buildGoogleMapsUrl(room.building);
+  const closeRequest = (room as BrokerInventoryRoom & { close_request?: { status: string } | null }).close_request;
+  const isClosePending = closeRequest?.status === "pending";
   const location = [room.building.ward, room.building.district, room.building.city]
     .filter(Boolean)
     .join(" · ");
 
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-[#BFDBFE] hover:shadow-md">
-      <div className="grid gap-0 md:grid-cols-[184px_minmax(0,1fr)]">
-        <div className="relative aspect-[4/3] bg-slate-100 md:aspect-auto md:min-h-48">
+      <div>
+        <div className="hidden">
           {thumbnailUrl ? (
             <img
               alt={room.title || `Phòng ${room.room_code}`}
@@ -53,6 +56,9 @@ export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
               <h5 className="truncate text-lg font-black text-slate-950">
                 {room.title || `Phòng ${room.room_code}`}
               </h5>
+              <div className="mt-2">
+                <StatusBadge status={room.status} />
+              </div>
               <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-600">
                 <Home className="size-4 shrink-0 text-slate-400" aria-hidden />
                 <span className="truncate">{room.building.name}</span>
@@ -104,15 +110,20 @@ export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
               >
                 Xem chi tiết
               </Link>
-              <RoomPostGeneratorButton
-                input={{
-                  building: room.building,
-                  features: room.features,
-                  images: room.thumbnail ? [room.thumbnail] : [],
-                  room
-                }}
-                label="Copy tin"
-              />
+              <form
+                action={(isClosePending ? cancelRoomCloseRequestFromForm : createRoomCloseRequestFromForm).bind(
+                  null,
+                  room.id
+                )}
+              >
+                <button
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                  type="submit"
+                >
+                  <CheckCircle2 className="size-3.5" aria-hidden />
+                  {isClosePending ? "Chờ chủ nhà xác nhận" : "Chốt phòng"}
+                </button>
+              </form>
               {room.room_drive_folder_url ? (
                 <ExternalButton href={room.room_drive_folder_url} label="Ảnh Drive" />
               ) : null}

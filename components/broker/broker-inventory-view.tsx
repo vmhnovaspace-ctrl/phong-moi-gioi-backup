@@ -1,4 +1,5 @@
 import { Building2, CheckCircle2, Clock3, UserRound } from "lucide-react";
+import Link from "next/link";
 import { BrokerFilterBar } from "@/components/broker/broker-filter-bar";
 import { BrokerRoomCard } from "@/components/broker/broker-room-card";
 import type { BrokerInventoryResult } from "@/lib/broker/types";
@@ -22,10 +23,18 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
             Duyệt phòng theo cây Chủ nhà → Căn nhà → Phòng, chỉ gồm dữ liệu visible và môi giới có quyền xem.
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:min-w-[420px]">
-          <SmallMetric icon={<CheckCircle2 className="size-4" aria-hidden />} label="Đang trống" value={availableRooms} />
-          <SmallMetric icon={<Clock3 className="size-4" aria-hidden />} label="Sắp trống" value={comingSoonRooms} />
-          <SmallMetric icon={<Building2 className="size-4" aria-hidden />} label="Căn nhà" value={buildingCount} />
+        <div className="space-y-2 sm:min-w-[420px]">
+          <Link
+            className="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-[#BFDBFE] bg-white px-3 text-sm font-bold text-[#0F5FD7] hover:bg-[#EFF6FF]"
+            href="/broker/guide"
+          >
+            Hướng dẫn
+          </Link>
+          <div className="grid grid-cols-3 gap-2">
+            <SmallMetric icon={<CheckCircle2 className="size-4" aria-hidden />} label="Đang trống" value={availableRooms} />
+            <SmallMetric icon={<Clock3 className="size-4" aria-hidden />} label="Sắp trống" value={comingSoonRooms} />
+            <SmallMetric icon={<Building2 className="size-4" aria-hidden />} label="Căn nhà" value={buildingCount} />
+          </div>
         </div>
       </div>
 
@@ -106,7 +115,7 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
           <Building2 className="mx-auto size-9 text-slate-300" aria-hidden />
           <h3 className="mt-3 text-base font-semibold text-slate-950">Không có phòng phù hợp</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-            Thử xóa bớt bộ lọc hoặc dùng từ khóa rộng hơn để xem các phòng môi giới có quyền truy cập.
+            Thử xóa bớt bộ lọc để xem các phòng Môi giới có quyền truy cập.
           </p>
         </section>
       )}

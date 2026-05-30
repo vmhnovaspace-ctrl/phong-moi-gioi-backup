@@ -14,7 +14,6 @@ import {
   Search,
   Send,
   SlidersHorizontal,
-  Sparkles,
   Trash2
 } from "lucide-react";
 import { markCustomerInterestEventRead } from "@/app/broker/actions";
@@ -22,15 +21,7 @@ import {
   hideCustomerRoomPackage,
   type CreateCustomerRoomPackageResult
 } from "@/app/broker/send/actions";
-import {
-  rankCustomerNeedRooms,
-  type CustomerNeedRoomMatch
-} from "@/lib/broker/customer-needs-parser";
-import {
-  matchesBrokerRoomSmartSearch,
-  normalizeBrokerSearchText,
-  parseBrokerRoomSearchQuery
-} from "@/lib/broker/search";
+import { matchesBrokerLandlordSearch } from "@/lib/broker/search";
 import type {
   BrokerInventoryFilters,
   BrokerInventoryRoom,
@@ -62,7 +53,11 @@ type CustomerFormState = {
   customerZaloLink: string;
 };
 
-type MatchedRoom = CustomerNeedRoomMatch;
+type MatchedRoom = BrokerInventoryRoom & {
+  matchLevel: "near";
+  matchReasons: string[];
+  score: number;
+};
 
 type SelectOption = {
   label: string;
@@ -85,7 +80,7 @@ export function BrokerSendToCustomerView({
     boundaryMode: "old",
     status: "all"
   });
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
   const [result, setResult] = useState<CreatedPackageResult | null>(null);
@@ -97,12 +92,7 @@ export function BrokerSendToCustomerView({
     () => rooms.filter((room) => filterSendRoom(room, filters)),
     [filters, rooms]
   );
-  const rankedRooms = useMemo(
-    () => rankCustomerNeedRooms(filteredRooms, form.customerNeed),
-    [filteredRooms, form.customerNeed]
-  );
-  const matchedRooms = rankedRooms.matches;
-  const parsedNeed = rankedRooms.parsed;
+  const matchedRooms = useMemo(() => filteredRooms.map(toSuggestedRoom), [filteredRooms]);
   const visibleRooms = hasSearched
     ? matchedRooms
     : filteredRooms.slice(0, 8).map(toSuggestedRoom);
@@ -124,7 +114,7 @@ export function BrokerSendToCustomerView({
   function resetFilters() {
     setForm((current) => ({ ...current, customerNeed: "" }));
     setFilters({ boundaryMode: "old", status: "all" });
-    setAdvancedOpen(false);
+    setAdvancedOpen(true);
     setHasSearched(false);
     setSelectedRoomIds([]);
     setResult(null);
@@ -161,7 +151,7 @@ export function BrokerSendToCustomerView({
           return;
         }
 
-        setResult(nextResult);
+        setResult(normalizePackageResult(nextResult));
         setToast("Đã tạo gói gửi khách.");
         window.setTimeout(() => setToast(null), 1800);
       } catch (packageError) {
@@ -183,8 +173,6 @@ export function BrokerSendToCustomerView({
         filters={filters}
         form={form}
         matchedCount={matchedRooms.length}
-        needChips={parsedNeed.chips}
-        needsFallbackKeyword={Boolean(form.customerNeed.trim()) && !parsedNeed.hasStructuredCriteria}
         onSearch={() => {
           setHasSearched(true);
           setSelectedRoomIds([]);
@@ -279,8 +267,6 @@ function SendCustomerSearchCard({
   filters,
   form,
   matchedCount,
-  needChips,
-  needsFallbackKeyword,
   onSearch,
   onToggleAdvanced,
   resetFilters,
@@ -293,8 +279,6 @@ function SendCustomerSearchCard({
   filters: BrokerInventoryFilters;
   form: CustomerFormState;
   matchedCount: number;
-  needChips: string[];
-  needsFallbackKeyword: boolean;
   onSearch: () => void;
   onToggleAdvanced: () => void;
   resetFilters: () => void;
@@ -315,11 +299,19 @@ function SendCustomerSearchCard({
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div>
-        <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
           <h2 className="text-xl font-bold text-slate-950">Tìm phòng và Gửi khách</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-            Nhập nhanh nhu cầu khách, hệ thống sẽ hiểu điều kiện chính và xếp phòng phù hợp lên trước.
+            Nhập thông tin khách, lọc phòng thủ công, chọn phòng phù hợp rồi tạo link gửi khách.
           </p>
+          </div>
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-md border border-[#BFDBFE] bg-white px-3 text-sm font-semibold text-[#0F5FD7] hover:bg-[#EFF6FF]"
+            href="/broker/guide"
+          >
+            Hướng dẫn
+          </Link>
         </div>
       </div>
 
@@ -344,45 +336,11 @@ function SendCustomerSearchCard({
         />
       </div>
 
-      <div className="mt-5 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-5 text-[#0F5FD7]" aria-hidden />
-            <h3 className="font-bold text-slate-950">Tìm phòng theo nhu cầu</h3>
-          </div>
-          <p className="shrink-0 text-sm font-semibold text-slate-600">
-            {selectedCount}/5 phòng đã chọn
-          </p>
-        </div>
-
-        <textarea
-          className="mt-3 min-h-24 w-full rounded-md border border-[#BFDBFE] bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#0F5FD7] focus:ring-2 focus:ring-[#93C5FD]"
-          onChange={(event) => updateField("customerNeed", event.target.value)}
-          placeholder="Ví dụ: 20m2 8tr Tân Bình có thang máy, full nội thất"
-          value={form.customerNeed}
-        />
-
-        {needChips.length > 0 ? (
-          <div className="mt-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Đã hiểu nhu cầu</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {needChips.map((chip) => (
-              <button
-                className="h-9 rounded-full border border-[#BFDBFE] bg-white px-3 text-sm font-semibold text-[#0B3B82]"
-                key={chip}
-                type="button"
-              >
-                {chip}
-              </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {needsFallbackKeyword ? (
-          <p className="mt-3 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-800">
-            Chưa nhận diện được điều kiện cụ thể, đang tìm theo từ khóa.
-          </p>
-        ) : null}
+      <div className="mt-5 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <h3 className="font-bold text-slate-950">Bộ lọc thủ công</h3>
+        <p className="shrink-0 text-sm font-semibold text-slate-600">
+          {selectedCount}/5 phòng đã chọn
+        </p>
       </div>
 
       <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)_auto] lg:items-end">
@@ -545,8 +503,8 @@ function SendRoomCard({
 
   return (
     <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <label className="grid cursor-pointer gap-0 sm:grid-cols-[156px_minmax(0,1fr)]">
-        <div className="relative aspect-[4/3] bg-slate-100 sm:aspect-auto">
+      <label className="block cursor-pointer">
+        <div className="hidden">
           {imageUrl ? (
             <img
               alt={room.title || "Ảnh phòng"}
@@ -558,14 +516,14 @@ function SendRoomCard({
               <ImageIcon className="size-8" aria-hidden />
             </div>
           )}
+        </div>
+        <div className="min-w-0 p-4">
           <input
             checked={checked}
-            className="absolute left-3 top-3 size-5 accent-[#0F5FD7]"
+            className="float-right ml-3 mt-1 size-5 accent-[#0F5FD7]"
             onChange={onToggle}
             type="checkbox"
           />
-        </div>
-        <div className="min-w-0 p-4">
           <div className="flex flex-wrap items-center gap-1.5">
             <ImageBadge hasDrive={hasDrive} hasImage={hasImage} />
             {!hasImage && !hasDrive ? (
@@ -818,19 +776,19 @@ function ZaloSendButton({
 }) {
   const zaloUrl = buildZaloUrl(customerPhone, customerZaloLink);
 
-  if (!customerPhone || !zaloUrl) {
+  if (!zaloUrl) {
     return (
       <div className="space-y-1">
         <button
           className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-100 px-3 text-sm font-semibold text-slate-400"
           disabled
-          title="Nhập số điện thoại khách để gửi Zalo"
+          title="Nhập số điện thoại hoặc link Zalo khách để gửi Zalo"
           type="button"
         >
           <Send className="size-4" aria-hidden />
           Gửi Zalo
         </button>
-        <p className="text-xs text-slate-500">Nhập số điện thoại khách để gửi Zalo</p>
+        <p className="text-xs text-slate-500">Nhập số điện thoại hoặc link Zalo khách để gửi Zalo</p>
       </div>
     );
   }
@@ -990,13 +948,13 @@ function RecentPackages({
                   customerPhone={item.customer_phone}
                   customerZaloLink={item.customer_zalo_link}
                   message={() =>
-                    buildZaloMessage(item.customer_name, `${window.location.origin}/p/${item.public_slug}`)
+                    buildZaloMessage(item.customer_name, getClientPackageUrl(item.public_slug))
                   }
                 />
                 <button
                   className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
                   onClick={() => {
-                    const packageUrl = `${window.location.origin}/p/${item.public_slug}`;
+                    const packageUrl = getClientPackageUrl(item.public_slug);
                     copyText(buildZaloMessage(item.customer_name, packageUrl), "Đã copy lại tin nhắn.");
                   }}
                   type="button"
@@ -1107,12 +1065,13 @@ function filterSendRoom(room: BrokerInventoryRoom, rawFilters: BrokerInventoryFi
   }
 
   if (filters.landlord) {
-    const needle = normalizeBrokerSearchText(filters.landlord);
-    const haystack = normalizeBrokerSearchText(
-      `${room.landlord?.full_name ?? ""} ${room.landlord?.phone ?? ""}`
-    );
-
-    if (!haystack.includes(needle)) {
+    if (
+      !matchesBrokerLandlordSearch({
+        input: filters.landlord,
+        landlordName: room.landlord?.full_name,
+        landlordPhone: room.landlord?.phone
+      })
+    ) {
       return false;
     }
   }
@@ -1143,7 +1102,7 @@ function filterSendRoom(room: BrokerInventoryRoom, rawFilters: BrokerInventoryFi
     return false;
   }
 
-  return matchesBrokerRoomSmartSearch(room, parseBrokerRoomSearchQuery(filters.q));
+  return true;
 }
 
 function numberValue(value: number | string | null | undefined) {
@@ -1221,6 +1180,22 @@ function buildZaloUrl(customerPhone: string | null, customerZaloLink: string | n
       : digits;
 
   return `https://zalo.me/${normalizedPhone}`;
+}
+
+function getClientPackageUrl(publicSlug: string) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || window.location.origin;
+
+  return `${siteUrl.replace(/\/$/, "")}/p/${publicSlug}`;
+}
+
+function normalizePackageResult(result: CreatedPackageResult): CreatedPackageResult {
+  const packageUrl = getClientPackageUrl(result.publicSlug);
+
+  return {
+    ...result,
+    message: buildZaloMessage(result.customerName, packageUrl),
+    packageUrl
+  };
 }
 
 function buildZaloMessage(customerName: string | null, packageUrl: string) {

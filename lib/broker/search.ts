@@ -49,6 +49,57 @@ export function normalizeBrokerSearchText(value: string | number | null | undefi
     .trim();
 }
 
+export function normalizeVietnamPhoneForSearch(value: string | number | null | undefined) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+
+  if (!digits) {
+    return "";
+  }
+
+  if (digits.startsWith("84") && digits.length >= 11) {
+    return `0${digits.slice(2)}`;
+  }
+
+  if (digits.startsWith("0")) {
+    return digits;
+  }
+
+  if (digits.length === 9) {
+    return `0${digits}`;
+  }
+
+  return digits;
+}
+
+export function matchesBrokerLandlordSearch({
+  input,
+  landlordName,
+  landlordPhone
+}: {
+  input: string | null | undefined;
+  landlordName: string | null | undefined;
+  landlordPhone: string | null | undefined;
+}) {
+  const textNeedle = normalizeBrokerSearchText(input);
+
+  if (!textNeedle) {
+    return true;
+  }
+
+  if (normalizeBrokerSearchText(landlordName).includes(textNeedle)) {
+    return true;
+  }
+
+  const phoneNeedle = normalizeVietnamPhoneForSearch(input);
+  const phoneHaystack = normalizeVietnamPhoneForSearch(landlordPhone);
+
+  return Boolean(
+    phoneNeedle &&
+      phoneHaystack &&
+      (phoneHaystack.includes(phoneNeedle) || phoneNeedle.includes(phoneHaystack))
+  );
+}
+
 export function normalizeVietnameseText(value: string | number | null | undefined) {
   return normalizeBrokerSearchText(value)
     .replace(/\b(thanh pho|tp\.?|quan|q\.?|huyen|h\.?|phuong|p\.?|xa|thi tran)\b/g, " ")
