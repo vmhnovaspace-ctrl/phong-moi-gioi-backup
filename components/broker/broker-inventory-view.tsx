@@ -52,22 +52,22 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
               className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
               key={landlordGroup.landlord?.id ?? landlordGroup.buildings[0]?.building.landlord_id}
             >
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
+              <div className="border-b border-[#12345A] bg-gradient-to-r from-[#082F49] to-[#0F5FD7] px-4 py-4 text-white">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#0F5FD7]">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white ring-1 ring-white/20">
                       <UserRound className="size-5" aria-hidden />
                     </div>
                     <div className="min-w-0">
-                    <h3 className="truncate text-base font-black text-slate-950">
+                    <h3 className="truncate text-base font-black text-white">
                         {landlordGroup.landlord?.full_name ?? "Chủ nhà"}
                       </h3>
                       {landlordGroup.landlord?.phone ? (
-                        <p className="mt-0.5 text-sm text-slate-500">{landlordGroup.landlord.phone}</p>
+                        <p className="mt-0.5 text-sm text-blue-100">{landlordGroup.landlord.phone}</p>
                       ) : null}
                     </div>
                   </div>
-                  <span className="w-fit rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-bold text-slate-700">
+                  <span className="w-fit rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-bold text-white">
                     {landlordGroup.total_rooms} phòng sell
                   </span>
                 </div>
@@ -76,14 +76,14 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
               <div className="space-y-3 p-3 sm:p-4">
                 {landlordGroup.buildings.map((buildingGroup) => (
                   <section
-                    className="rounded-2xl border border-slate-200 bg-white"
+                    className="rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF]"
                     key={buildingGroup.building.id}
                   >
-                    <div className="border-b border-slate-100 px-4 py-3">
+                    <div className="border-b border-[#BFDBFE] px-4 py-3">
                       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0">
-                          <h4 className="font-black text-slate-950">{buildingGroup.building.name}</h4>
-                          <p className="mt-1 line-clamp-2 text-sm text-slate-500">
+                          <h4 className="font-black text-slate-800">{buildingGroup.building.name}</h4>
+                          <p className="mt-1 line-clamp-2 text-sm text-slate-600">
                             {buildingGroup.building.address}
                             {buildingGroup.building.ward ? ` · ${buildingGroup.building.ward}` : ""}
                             {buildingGroup.building.district ? ` · ${buildingGroup.building.district}` : ""}

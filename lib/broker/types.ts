@@ -90,6 +90,7 @@ export type BrokerInventoryFeatureSummary = Pick<
 export type BrokerInventoryRoom = BrokerRoomListItem & {
   features: BrokerInventoryFeatureSummary | null;
   thumbnail: BrokerRoomThumbnail | null;
+  close_request?: BrokerRoomCloseRequestState | null;
 };
 
 export type BrokerInventoryFilters = {
