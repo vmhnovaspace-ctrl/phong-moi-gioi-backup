@@ -3,6 +3,8 @@ import type {
   BrokerDashboard,
   BrokerActionRoom,
   BrokerActionRoomSource,
+  BrokerClosedRoom,
+  BrokerClosedRoomPeriod,
   BrokerSendToCustomerData,
   BrokerActionWorkspaceRoom,
   BrokerInventoryFilters,
@@ -132,12 +134,19 @@ const BROKER_INVENTORY_SELECT =
   "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at, buildings!inner(id, name, address, ward, district, city, landlord_id, latitude, longitude, formatted_address, google_place_id, google_maps_url), room_features(allows_pet, has_air_conditioner, has_balcony, has_bed, has_elevator, has_fridge, has_washing_machine, has_parking, has_private_bathroom, has_private_kitchen, has_security, has_wardrobe, has_window, is_furnished), room_images(id, image_url, storage_path, source_type, sort_order, is_cover)";
 const BROKER_INVENTORY_SELECT_FALLBACK =
   "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at, buildings!inner(id, name, address, ward, district, city, landlord_id, google_maps_url), room_features(allows_pet, has_air_conditioner, has_balcony, has_bed, has_elevator, has_fridge, has_washing_machine, has_parking, has_private_bathroom, has_private_kitchen, has_security, has_wardrobe, has_window, is_furnished), room_images(id, image_url, storage_path, source_type, sort_order, is_cover)";
+const BROKER_CLOSED_ROOM_SELECT =
+  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at, buildings!inner(id, name, address, ward, district, city, landlord_id, latitude, longitude, formatted_address, google_place_id, google_maps_url)";
+const BROKER_CLOSED_ROOM_SELECT_FALLBACK =
+  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at, buildings!inner(id, name, address, ward, district, city, landlord_id, google_maps_url)";
 const BROKER_INVENTORY_PAGE_SIZE = 1000;
 
 const BROKER_ROOM_DETAIL_SELECT =
   "*, buildings!inner(id, name, address, ward, district, city, latitude, longitude, formatted_address, google_place_id, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, landlord_id, building_fees(*))";
 const BROKER_ROOM_DETAIL_SELECT_FALLBACK =
   "*, buildings!inner(id, name, address, ward, district, city, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, landlord_id, building_fees(*))";
+const BROKER_CLOSE_REQUEST_SELECT =
+  "id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at";
+const BROKER_CLOSE_REQUEST_SELECT_WITH_ACK = `${BROKER_CLOSE_REQUEST_SELECT}, broker_acknowledged_at`;
 
 function firstRelation<T>(value: T | T[] | null | undefined) {
   if (!value) {
@@ -171,6 +180,25 @@ function isMissingMapColumnError(error: { message?: string; code?: string }) {
     message.includes("formatted_address") ||
     message.includes("google_place_id")
   );
+}
+
+function isMissingBrokerAckColumnError(error: { message?: string; code?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+
+  return (
+    error.code === "42703" ||
+    error.code === "PGRST204" ||
+    message.includes("broker_acknowledged_at")
+  );
+}
+
+function withCloseRequestAckDefaults(
+  rows: Array<Omit<BrokerRoomCloseRequestRow, "broker_acknowledged_at">> | null
+): BrokerRoomCloseRequestRow[] {
+  return (rows ?? []).map((row) => ({
+    ...row,
+    broker_acknowledged_at: null
+  }));
 }
 
 async function getLandlordsById(ids: string[]) {
@@ -502,13 +530,27 @@ async function attachBrokerCloseRequests(rooms: BrokerInventoryRoom[], brokerId?
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("room_close_requests")
-    .select("id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at")
+    .select(BROKER_CLOSE_REQUEST_SELECT_WITH_ACK)
     .eq("broker_id", brokerId)
     .in("room_id", rooms.map((room) => room.id))
+    .in("status", ["pending", "approved", "rejected"])
     .order("created_at", { ascending: false })
     .returns<BrokerRoomCloseRequestRow[]>();
+
+  if (error && isMissingBrokerAckColumnError(error)) {
+    const fallback = await supabase
+      .from("room_close_requests")
+      .select(BROKER_CLOSE_REQUEST_SELECT)
+      .eq("broker_id", brokerId)
+      .in("room_id", rooms.map((room) => room.id))
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .returns<Array<Omit<BrokerRoomCloseRequestRow, "broker_acknowledged_at">>>();
+    data = withCloseRequestAckDefaults(fallback.data ?? null);
+    error = fallback.error;
+  }
 
   if (error) {
     if (isMissingRoomCloseRequestsTable(error)) {
@@ -521,7 +563,13 @@ async function attachBrokerCloseRequests(rooms: BrokerInventoryRoom[], brokerId?
   const requestByRoomId = new Map<string, BrokerRoomCloseRequestRow>();
 
   for (const request of data ?? []) {
-    if (!requestByRoomId.has(request.room_id)) {
+    if (request.status !== "pending" && request.broker_acknowledged_at) {
+      continue;
+    }
+
+    const existingRequest = requestByRoomId.get(request.room_id);
+
+    if (!existingRequest || (request.status === "pending" && existingRequest.status !== "pending")) {
       requestByRoomId.set(request.room_id, request);
     }
   }
@@ -647,7 +695,7 @@ export async function getBrokerRoom(roomId: string, brokerId: string): Promise<B
       .maybeSingle<BrokerRoomActionRow>(),
     supabase
       .from("room_close_requests")
-      .select("id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at")
+      .select("id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at, broker_acknowledged_at")
       .eq("broker_id", brokerId)
       .eq("room_id", roomId)
       .order("created_at", { ascending: false })
@@ -706,7 +754,7 @@ export async function getBrokerRoomCloseRequest(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("room_close_requests")
-    .select("id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at")
+    .select("id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at, broker_acknowledged_at")
     .eq("broker_id", brokerId)
     .eq("room_id", roomId)
     .order("created_at", { ascending: false })
@@ -855,6 +903,128 @@ export async function getBrokerHandledCustomerInterestRooms(
   const rooms = await rowsToInventoryRooms(roomsData ?? []);
 
   return rooms.sort((a, b) => (roomOrder.get(a.id) ?? 0) - (roomOrder.get(b.id) ?? 0));
+}
+
+function getClosedRoomDateRange(period: BrokerClosedRoomPeriod) {
+  const now = new Date();
+  const bangkokParts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Bangkok",
+    year: "numeric"
+  }).formatToParts(now);
+  const year = Number(bangkokParts.find((part) => part.type === "year")?.value);
+  const month = Number(bangkokParts.find((part) => part.type === "month")?.value);
+  const day = Number(bangkokParts.find((part) => part.type === "day")?.value);
+  const bangkokOffsetMs = 7 * 60 * 60 * 1000;
+  const start = new Date(Date.UTC(year, month - 1, day) - bangkokOffsetMs);
+
+  if (period === "week") {
+    const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    start.setUTCDate(start.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  }
+
+  if (period === "month") {
+    start.setTime(Date.UTC(year, month - 1, 1) - bangkokOffsetMs);
+  }
+
+  return { end: now, start };
+}
+
+function toBrokerClosedRoom(
+  row: BrokerRoomRow,
+  closeRequest: BrokerRoomCloseRequestRow,
+  landlords: Map<string, BrokerLandlordContact>
+): BrokerClosedRoom | null {
+  const building = firstRelation(row.buildings);
+
+  if (!building || closeRequest.status !== "approved") {
+    return null;
+  }
+
+  const { buildings: _buildings, building_id: _buildingId, ...room } = row;
+  const normalizedBuilding = withMapFieldDefaults(building);
+
+  return {
+    ...room,
+    building: normalizedBuilding,
+    close_request: closeRequest as BrokerRoomCloseRequestRow & { status: "approved" },
+    confirmed_at: closeRequest.resolved_at ?? closeRequest.updated_at,
+    landlord: landlords.get(normalizedBuilding.landlord_id) ?? null
+  };
+}
+
+export async function getBrokerClosedRooms(
+  brokerId: string,
+  period: BrokerClosedRoomPeriod = "today"
+): Promise<BrokerClosedRoom[]> {
+  const supabase = await createClient();
+  const { end, start } = getClosedRoomDateRange(period);
+  const { data, error } = await supabase
+    .from("room_close_requests")
+    .select(BROKER_CLOSE_REQUEST_SELECT)
+    .eq("broker_id", brokerId)
+    .eq("status", "approved")
+    .order("updated_at", { ascending: false })
+    .returns<Array<Omit<BrokerRoomCloseRequestRow, "broker_acknowledged_at">>>();
+
+  if (error) {
+    if (isMissingRoomCloseRequestsTable(error)) {
+      return [];
+    }
+
+    throw new Error(error.message);
+  }
+
+  const requests = withCloseRequestAckDefaults(data ?? null).filter((request) => {
+    const confirmedAt = new Date(request.resolved_at ?? request.updated_at).getTime();
+
+    return confirmedAt >= start.getTime() && confirmedAt <= end.getTime();
+  });
+  const roomIds = Array.from(new Set(requests.map((request) => request.room_id)));
+
+  if (roomIds.length === 0) {
+    return [];
+  }
+
+  let { data: roomsData, error: roomsError } = await supabase
+    .from("rooms")
+    .select(BROKER_CLOSED_ROOM_SELECT)
+    .eq("visibility", "visible")
+    .eq("buildings.visibility", "visible")
+    .in("id", roomIds)
+    .returns<BrokerRoomRow[]>();
+
+  if (roomsError && isMissingMapColumnError(roomsError)) {
+    const fallback = await supabase
+      .from("rooms")
+      .select(BROKER_CLOSED_ROOM_SELECT_FALLBACK)
+      .eq("visibility", "visible")
+      .eq("buildings.visibility", "visible")
+      .in("id", roomIds)
+      .returns<BrokerRoomRow[]>();
+    roomsData = fallback.data;
+    roomsError = fallback.error;
+  }
+
+  if (roomsError) {
+    throw new Error(roomsError.message);
+  }
+
+  const requestByRoomId = new Map(requests.map((request) => [request.room_id, request]));
+  const landlordIds = (roomsData ?? [])
+    .map((row) => firstRelation(row.buildings)?.landlord_id ?? null)
+    .filter((value): value is string => Boolean(value));
+  const landlords = await getLandlordsById(landlordIds);
+
+  return (roomsData ?? [])
+    .map((row) => {
+      const request = requestByRoomId.get(row.id);
+
+      return request ? toBrokerClosedRoom(row, request, landlords) : null;
+    })
+    .filter((room): room is BrokerClosedRoom => room !== null)
+    .sort((a, b) => new Date(b.confirmed_at).getTime() - new Date(a.confirmed_at).getTime());
 }
 
 export async function getBrokerActionRooms(brokerId: string): Promise<BrokerActionRoom[]> {
@@ -1146,6 +1316,7 @@ function isMissingCustomerInterestEventTable(error: { message?: string; code?: s
   return (
     error.code === "42P01" ||
     error.code === "42703" ||
+    error.code === "42883" ||
     error.code === "PGRST204" ||
     message.includes("customer_room_package_events") ||
     message.includes("schema cache")

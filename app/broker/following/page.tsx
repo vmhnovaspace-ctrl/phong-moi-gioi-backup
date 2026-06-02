@@ -1,13 +1,32 @@
 import { BrokerFollowingView } from "@/components/broker/broker-following-view";
 import { requireRole } from "@/lib/auth/profile";
-import { getBrokerHandledCustomerInterestRooms, getBrokerSavedRooms } from "@/lib/broker/queries";
+import { getBrokerClosedRooms, getBrokerHandledCustomerInterestRooms, getBrokerSavedRooms } from "@/lib/broker/queries";
+import type { BrokerClosedRoomPeriod } from "@/lib/broker/types";
 
-export default async function BrokerFollowingPage() {
+type BrokerFollowingPageProps = {
+  searchParams?: Promise<{ closed?: string }>;
+};
+
+const closedPeriods: BrokerClosedRoomPeriod[] = ["today", "week", "month"];
+
+export default async function BrokerFollowingPage({ searchParams }: BrokerFollowingPageProps) {
   const profile = await requireRole(["broker"]);
-  const [savedRooms, interestedRooms] = await Promise.all([
+  const params = await searchParams;
+  const closedPeriod = closedPeriods.includes(params?.closed as BrokerClosedRoomPeriod)
+    ? (params?.closed as BrokerClosedRoomPeriod)
+    : "today";
+  const [savedRooms, interestedRooms, closedRooms] = await Promise.all([
     getBrokerSavedRooms(profile.id),
-    getBrokerHandledCustomerInterestRooms(profile.id)
+    getBrokerHandledCustomerInterestRooms(profile.id),
+    getBrokerClosedRooms(profile.id, closedPeriod)
   ]);
 
-  return <BrokerFollowingView interestedRooms={interestedRooms} savedRooms={savedRooms} />;
+  return (
+    <BrokerFollowingView
+      closedPeriod={closedPeriod}
+      closedRooms={closedRooms}
+      interestedRooms={interestedRooms}
+      savedRooms={savedRooms}
+    />
+  );
 }

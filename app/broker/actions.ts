@@ -65,8 +65,12 @@ function isMissingRoomCloseRequestsTable(error: { message?: string; code?: strin
   return (
     error.code === "42P01" ||
     error.code === "42703" ||
+    error.code === "42883" ||
+    error.code === "PGRST202" ||
     error.code === "PGRST204" ||
     error.code === "PGRST205" ||
+    message.includes("acknowledge_room_close_request") ||
+    message.includes("cancel_room_close_request") ||
     message.includes("room_close_requests") ||
     message.includes("schema cache")
   );
@@ -183,18 +187,19 @@ export async function createRoomCloseRequest(
 }
 
 export async function createRoomCloseRequestFromForm(roomId: string) {
-  await createRoomCloseRequest(roomId);
+  const result = await createRoomCloseRequest(roomId);
+
+  if (result.error) {
+    throw new Error(result.error);
+  }
 }
 
 export async function cancelRoomCloseRequest(roomId: string): Promise<BrokerActionResult> {
-  const profile = await requireRole(["broker"]);
+  await requireRole(["broker"]);
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("room_close_requests")
-    .update({ status: "cancelled" })
-    .eq("room_id", roomId)
-    .eq("broker_id", profile.id)
-    .eq("status", "pending");
+  const { error } = await supabase.rpc("cancel_room_close_request", {
+    room_uuid: roomId
+  });
 
   if (error) {
     if (isMissingRoomCloseRequestsTable(error)) {
@@ -205,13 +210,49 @@ export async function cancelRoomCloseRequest(roomId: string): Promise<BrokerActi
   }
 
   revalidateBrokerRoomPaths(roomId);
+  revalidatePath("/broker/rooms");
   revalidatePath("/landlord/sell-list");
 
   return { message: "Đã hủy báo chốt phòng." };
 }
 
 export async function cancelRoomCloseRequestFromForm(roomId: string) {
-  await cancelRoomCloseRequest(roomId);
+  const result = await cancelRoomCloseRequest(roomId);
+
+  if (result.error) {
+    throw new Error(result.error);
+  }
+}
+
+export async function acknowledgeRoomCloseRequest(
+  requestId: string,
+  roomId: string
+): Promise<BrokerActionResult> {
+  await requireRole(["broker"]);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("acknowledge_room_close_request", {
+    close_request_id: requestId
+  });
+
+  if (error) {
+    if (isMissingRoomCloseRequestsTable(error)) {
+      return { error: roomCloseRequestsMigrationMessage() };
+    }
+
+    return { error: error.message };
+  }
+
+  revalidateBrokerRoomPaths(roomId);
+
+  return { message: "Đã ghi nhận kết quả báo chốt." };
+}
+
+export async function acknowledgeRoomCloseRequestFromForm(requestId: string, roomId: string) {
+  const result = await acknowledgeRoomCloseRequest(requestId, roomId);
+
+  if (result.error) {
+    throw new Error(result.error);
+  }
 }
 
 export async function updateBrokerRoomAction(roomId: string, formData: FormData) {

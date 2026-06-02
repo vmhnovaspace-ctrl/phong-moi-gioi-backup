@@ -67,9 +67,9 @@ function parseFilters(params: Record<string, string | string[] | undefined>): Br
 }
 
 export default async function BrokerRoomsPage({ searchParams }: BrokerRoomsPageProps) {
-  await requireRole(["broker"]);
+  const profile = await requireRole(["broker"]);
   const filters = parseFilters(await searchParams);
-  const inventory = await getBrokerInventory(filters);
+  const inventory = await getBrokerInventory(filters, profile.id);
 
   return <BrokerInventoryView inventory={inventory} />;
 }

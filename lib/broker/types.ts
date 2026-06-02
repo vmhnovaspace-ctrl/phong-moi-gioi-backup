@@ -169,6 +169,14 @@ export type BrokerRoomCloseRequestState = {
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
+  broker_acknowledged_at: string | null;
+};
+
+export type BrokerClosedRoomPeriod = "today" | "week" | "month";
+
+export type BrokerClosedRoom = BrokerRoomListItem & {
+  close_request: BrokerRoomCloseRequestState & { status: "approved" };
+  confirmed_at: string;
 };
 
 export type BrokerRoomDetail = BrokerRoomListItem &

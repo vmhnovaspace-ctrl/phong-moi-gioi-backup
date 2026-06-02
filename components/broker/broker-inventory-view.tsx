@@ -1,5 +1,6 @@
 import { Building2, CheckCircle2, Clock3, UserRound } from "lucide-react";
 import Link from "next/link";
+import { BrokerAutoRefresh } from "@/components/broker/broker-auto-refresh";
 import { BrokerFilterBar } from "@/components/broker/broker-filter-bar";
 import { BrokerRoomCard } from "@/components/broker/broker-room-card";
 import type { BrokerInventoryResult } from "@/lib/broker/types";
@@ -16,6 +17,7 @@ export function BrokerInventoryView({ inventory }: BrokerInventoryViewProps) {
 
   return (
     <div className="space-y-5">
+      <BrokerAutoRefresh intervalMs={15000} />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-2xl font-black text-slate-950">Kho phòng môi giới</h2>

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { CheckCircle2, ExternalLink, RotateCcw, Star } from "lucide-react";
-import { cancelRoomCloseRequestFromForm, createRoomCloseRequestFromForm } from "@/app/broker/actions";
+import { ExternalLink, Star } from "lucide-react";
+import { BrokerCloseRequestButton } from "@/components/broker/broker-close-request-button";
 import { StatusBadge } from "@/components/landlord/status-badge";
 import type { BrokerInventoryRoom } from "@/lib/broker/types";
 import { formatCurrencyVnd } from "@/lib/landlord/format";
@@ -10,9 +10,6 @@ type BrokerRoomCardProps = {
 };
 
 export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
-  const closeRequest = room.close_request;
-  const isClosePending = closeRequest?.status === "pending";
-  const isCloseResolved = closeRequest?.status === "approved" || closeRequest?.status === "rejected";
   const roomType = getRoomTypeLabel(room);
 
   return (
@@ -59,29 +56,7 @@ export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
           >
             Xem chi tiết
           </Link>
-          {isCloseResolved ? (
-            <button
-              className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-500"
-              disabled
-              type="button"
-            >
-              {closeRequest.status === "approved" ? "Chủ nhà đã xác nhận" : "Chủ nhà đã từ chối"}
-            </button>
-          ) : (
-            <form action={(isClosePending ? cancelRoomCloseRequestFromForm : createRoomCloseRequestFromForm).bind(null, room.id)}>
-              <button
-                className="inline-flex min-h-10 w-full items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
-                type="submit"
-              >
-                {isClosePending ? (
-                  <RotateCcw className="size-3.5" aria-hidden />
-                ) : (
-                  <CheckCircle2 className="size-3.5" aria-hidden />
-                )}
-                {isClosePending ? "Chờ chủ nhà xác nhận" : "Chốt phòng"}
-              </button>
-            </form>
-          )}
+          <BrokerCloseRequestButton closeRequest={room.close_request} roomId={room.id} />
           {room.room_drive_folder_url ? <ExternalButton href={room.room_drive_folder_url} label="Ảnh/Drive" /> : null}
         </div>
       </div>
