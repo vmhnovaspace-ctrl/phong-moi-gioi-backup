@@ -147,6 +147,14 @@ const BROKER_ROOM_DETAIL_SELECT_FALLBACK =
 const BROKER_CLOSE_REQUEST_SELECT =
   "id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at";
 const BROKER_CLOSE_REQUEST_SELECT_WITH_ACK = `${BROKER_CLOSE_REQUEST_SELECT}, broker_acknowledged_at`;
+const BROKER_VISIBLE_CLOSE_REQUEST_STATUSES = [
+  "pending",
+  "approved",
+  "confirmed",
+  "completed",
+  "rejected"
+] as const;
+const BROKER_CLOSED_REQUEST_STATUSES = ["approved", "confirmed", "completed"] as const;
 
 function firstRelation<T>(value: T | T[] | null | undefined) {
   if (!value) {
@@ -199,6 +207,30 @@ function withCloseRequestAckDefaults(
     ...row,
     broker_acknowledged_at: null
   }));
+}
+
+function isBrokerClosedRequestStatus(status: BrokerRoomCloseRequestRow["status"]) {
+  return BROKER_CLOSED_REQUEST_STATUSES.includes(
+    status as (typeof BROKER_CLOSED_REQUEST_STATUSES)[number]
+  );
+}
+
+function getBrokerCloseRequestConfirmedAt(closeRequest: Pick<
+  BrokerRoomCloseRequestRow,
+  "resolved_at" | "updated_at" | "created_at"
+>) {
+  return closeRequest.resolved_at ?? closeRequest.updated_at ?? closeRequest.created_at;
+}
+
+function normalizeBrokerCloseRequest(closeRequest: BrokerRoomCloseRequestRow) {
+  if (!isBrokerClosedRequestStatus(closeRequest.status) || closeRequest.status === "approved") {
+    return closeRequest;
+  }
+
+  return {
+    ...closeRequest,
+    status: "approved"
+  } satisfies BrokerRoomCloseRequestRow;
 }
 
 async function getLandlordsById(ids: string[]) {
@@ -535,7 +567,7 @@ async function attachBrokerCloseRequests(rooms: BrokerInventoryRoom[], brokerId?
     .select(BROKER_CLOSE_REQUEST_SELECT_WITH_ACK)
     .eq("broker_id", brokerId)
     .in("room_id", rooms.map((room) => room.id))
-    .in("status", ["pending", "approved", "rejected"])
+    .in("status", [...BROKER_VISIBLE_CLOSE_REQUEST_STATUSES])
     .order("created_at", { ascending: false })
     .returns<BrokerRoomCloseRequestRow[]>();
 
@@ -545,7 +577,7 @@ async function attachBrokerCloseRequests(rooms: BrokerInventoryRoom[], brokerId?
       .select(BROKER_CLOSE_REQUEST_SELECT)
       .eq("broker_id", brokerId)
       .in("room_id", rooms.map((room) => room.id))
-      .eq("status", "pending")
+      .in("status", [...BROKER_VISIBLE_CLOSE_REQUEST_STATUSES])
       .order("created_at", { ascending: false })
       .returns<Array<Omit<BrokerRoomCloseRequestRow, "broker_acknowledged_at">>>();
     data = withCloseRequestAckDefaults(fallback.data ?? null);
@@ -562,7 +594,9 @@ async function attachBrokerCloseRequests(rooms: BrokerInventoryRoom[], brokerId?
 
   const requestByRoomId = new Map<string, BrokerRoomCloseRequestRow>();
 
-  for (const request of data ?? []) {
+  for (const rawRequest of data ?? []) {
+    const request = normalizeBrokerCloseRequest(rawRequest);
+
     if (request.status !== "pending" && request.broker_acknowledged_at) {
       continue;
     }
@@ -743,7 +777,7 @@ export async function getBrokerRoom(roomId: string, brokerId: string): Promise<B
     features: features ?? null,
     images: signedImages,
     landlord: landlord ?? null,
-    close_request: closeRequestError ? null : closeRequest ?? null
+    close_request: closeRequestError ? null : closeRequest ? normalizeBrokerCloseRequest(closeRequest) : null
   } satisfies BrokerRoomDetail;
 }
 
@@ -769,7 +803,36 @@ export async function getBrokerRoomCloseRequest(
     throw new Error(error.message);
   }
 
-  return data ?? null;
+  return data ? normalizeBrokerCloseRequest(data) : null;
+}
+
+async function getBrokerClosedRoomIdSet(brokerId: string, roomIds: string[]) {
+  if (roomIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("room_close_requests")
+    .select("room_id, status")
+    .eq("broker_id", brokerId)
+    .in("room_id", roomIds)
+    .in("status", [...BROKER_CLOSED_REQUEST_STATUSES])
+    .returns<Array<Pick<BrokerRoomCloseRequestRow, "room_id" | "status">>>();
+
+  if (error) {
+    if (isMissingRoomCloseRequestsTable(error)) {
+      return new Set<string>();
+    }
+
+    throw new Error(error.message);
+  }
+
+  return new Set(
+    (data ?? [])
+      .filter((request) => isBrokerClosedRequestStatus(request.status))
+      .map((request) => request.room_id)
+  );
 }
 
 export async function getBrokerSavedRooms(brokerId: string, limit?: number): Promise<BrokerSavedRoom[]> {
@@ -873,13 +936,20 @@ export async function getBrokerHandledCustomerInterestRooms(
     return [];
   }
 
+  const closedRoomIds = await getBrokerClosedRoomIdSet(brokerId, roomIds);
+  const activeRoomIds = roomIds.filter((roomId) => !closedRoomIds.has(roomId));
+
+  if (activeRoomIds.length === 0) {
+    return [];
+  }
+
   let { data: roomsData, error: roomsError } = await supabase
     .from("rooms")
     .select(BROKER_INVENTORY_SELECT)
     .eq("visibility", "visible")
     .eq("buildings.visibility", "visible")
     .in("status", ["available", "coming_soon"])
-    .in("id", roomIds)
+    .in("id", activeRoomIds)
     .returns<BrokerInventoryRoomRow[]>();
 
   if (roomsError && isMissingMapColumnError(roomsError)) {
@@ -889,7 +959,7 @@ export async function getBrokerHandledCustomerInterestRooms(
       .eq("visibility", "visible")
       .eq("buildings.visibility", "visible")
       .in("status", ["available", "coming_soon"])
-      .in("id", roomIds)
+      .in("id", activeRoomIds)
       .returns<BrokerInventoryRoomRow[]>();
     roomsData = fallback.data;
     roomsError = fallback.error;
@@ -899,7 +969,7 @@ export async function getBrokerHandledCustomerInterestRooms(
     throw new Error(roomsError.message);
   }
 
-  const roomOrder = new Map(roomIds.map((roomId, index) => [roomId, index]));
+  const roomOrder = new Map(activeRoomIds.map((roomId, index) => [roomId, index]));
   const rooms = await rowsToInventoryRooms(roomsData ?? []);
 
   return rooms.sort((a, b) => (roomOrder.get(a.id) ?? 0) - (roomOrder.get(b.id) ?? 0));
@@ -938,7 +1008,7 @@ function toBrokerClosedRoom(
 ): BrokerClosedRoom | null {
   const building = firstRelation(row.buildings);
 
-  if (!building || closeRequest.status !== "approved") {
+  if (!building || !isBrokerClosedRequestStatus(closeRequest.status)) {
     return null;
   }
 
@@ -948,8 +1018,11 @@ function toBrokerClosedRoom(
   return {
     ...room,
     building: normalizedBuilding,
-    close_request: closeRequest as BrokerRoomCloseRequestRow & { status: "approved" },
-    confirmed_at: closeRequest.resolved_at ?? closeRequest.updated_at,
+    close_request: {
+      ...closeRequest,
+      status: "approved"
+    },
+    confirmed_at: getBrokerCloseRequestConfirmedAt(closeRequest),
     landlord: landlords.get(normalizedBuilding.landlord_id) ?? null
   };
 }
@@ -964,7 +1037,8 @@ export async function getBrokerClosedRooms(
     .from("room_close_requests")
     .select(BROKER_CLOSE_REQUEST_SELECT)
     .eq("broker_id", brokerId)
-    .eq("status", "approved")
+    .in("status", [...BROKER_CLOSED_REQUEST_STATUSES])
+    .order("resolved_at", { ascending: false, nullsFirst: false })
     .order("updated_at", { ascending: false })
     .returns<Array<Omit<BrokerRoomCloseRequestRow, "broker_acknowledged_at">>>();
 
@@ -976,12 +1050,35 @@ export async function getBrokerClosedRooms(
     throw new Error(error.message);
   }
 
-  const requests = withCloseRequestAckDefaults(data ?? null).filter((request) => {
-    const confirmedAt = new Date(request.resolved_at ?? request.updated_at).getTime();
+  const requestsByRoomId = new Map<string, BrokerRoomCloseRequestRow>();
 
-    return confirmedAt >= start.getTime() && confirmedAt <= end.getTime();
-  });
-  const roomIds = Array.from(new Set(requests.map((request) => request.room_id)));
+  for (const request of withCloseRequestAckDefaults(data ?? null)) {
+    if (!isBrokerClosedRequestStatus(request.status)) {
+      continue;
+    }
+
+    const confirmedAt = new Date(getBrokerCloseRequestConfirmedAt(request)).getTime();
+
+    if (Number.isNaN(confirmedAt) || confirmedAt < start.getTime() || confirmedAt > end.getTime()) {
+      continue;
+    }
+
+    const existing = requestsByRoomId.get(request.room_id);
+
+    if (!existing) {
+      requestsByRoomId.set(request.room_id, request);
+      continue;
+    }
+
+    const existingConfirmedAt = new Date(getBrokerCloseRequestConfirmedAt(existing)).getTime();
+
+    if (confirmedAt > existingConfirmedAt) {
+      requestsByRoomId.set(request.room_id, request);
+    }
+  }
+
+  const requests = Array.from(requestsByRoomId.values());
+  const roomIds = requests.map((request) => request.room_id);
 
   if (roomIds.length === 0) {
     return [];

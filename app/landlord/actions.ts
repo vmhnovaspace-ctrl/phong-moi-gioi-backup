@@ -423,6 +423,7 @@ function revalidateLandlordPaths(buildingId?: string, roomId?: string) {
 
 function revalidateBrokerRoomPaths(roomId: string) {
   revalidatePath("/broker");
+  revalidatePath("/broker/following");
   revalidatePath("/broker/rooms");
   revalidatePath("/broker/saved");
   revalidatePath("/broker/actions");
@@ -454,6 +455,14 @@ type CloseRequestRoomRow = {
           | { id: string; landlord_id: string; public_slug: string }
           | Array<{ id: string; landlord_id: string; public_slug: string }>;
       }>;
+};
+
+type PendingRoomCloseRequestRow = {
+  id: string;
+  room_id: string;
+  landlord_id: string;
+  status: string;
+  created_at: string;
 };
 
 function firstRelation<T>(value: T | T[] | null | undefined) {
@@ -490,6 +499,78 @@ async function loadOwnedCloseRequest(requestId: string, landlordId: string) {
   }
 
   return { building, request: data, room };
+}
+
+async function approvePendingCloseRequestForRoom({
+  ignoreMissingTable = false,
+  landlordId,
+  requestId,
+  resolvedBy,
+  roomId
+}: {
+  ignoreMissingTable?: boolean;
+  landlordId: string;
+  requestId?: string;
+  resolvedBy: string;
+  roomId: string;
+}) {
+  const supabase = await createClient();
+  let query = supabase
+    .from("room_close_requests")
+    .select("id, room_id, landlord_id, status, created_at")
+    .eq("landlord_id", landlordId)
+    .eq("room_id", roomId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (requestId) {
+    query = query.eq("id", requestId);
+  }
+
+  const { data: pendingRequest, error: pendingError } = await query.maybeSingle<PendingRoomCloseRequestRow>();
+
+  if (pendingError) {
+    if (ignoreMissingTable && isMissingRoomCloseRequestsTableError(pendingError)) {
+      return null;
+    }
+
+    if (isMissingRoomCloseRequestsTableError(pendingError)) {
+      throw new Error(missingRoomCloseRequestsMigrationMessage());
+    }
+
+    throw new Error(pendingError.message);
+  }
+
+  if (!pendingRequest) {
+    return null;
+  }
+
+  const { data: updatedRequest, error: updateError } = await supabase
+    .from("room_close_requests")
+    .update({
+      resolved_at: new Date().toISOString(),
+      resolved_by: resolvedBy,
+      status: "approved"
+    })
+    .eq("id", pendingRequest.id)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle<{ id: string }>();
+
+  if (updateError) {
+    if (ignoreMissingTable && isMissingRoomCloseRequestsTableError(updateError)) {
+      return null;
+    }
+
+    if (isMissingRoomCloseRequestsTableError(updateError)) {
+      throw new Error(missingRoomCloseRequestsMigrationMessage());
+    }
+
+    throw new Error(updateError.message);
+  }
+
+  return updatedRequest?.id ?? null;
 }
 
 export async function updateLandlordZaloGroupAction(
@@ -957,7 +1038,15 @@ export async function markRoomRentedFromSellListAction(roomId: string): Promise<
       return { error: error.message };
     }
 
+    await approvePendingCloseRequestForRoom({
+      ignoreMissingTable: true,
+      landlordId: profile.id,
+      resolvedBy: profile.id,
+      roomId
+    });
+
     revalidateLandlordPaths(ownedRoom.building_id, roomId);
+    revalidateBrokerRoomPaths(roomId);
     return { message: "Đã chốt phòng. Phòng đã chuyển sang trạng thái đã thuê." };
   } catch (error) {
     if (error instanceof Error) {
@@ -991,27 +1080,14 @@ export async function confirmRoomCloseRequest(requestId: string): Promise<Landlo
       return { error: roomError.message };
     }
 
-    const { data: updatedRequest, error: requestError } = await supabase
-      .from("room_close_requests")
-      .update({
-        resolved_at: new Date().toISOString(),
-        resolved_by: profile.id,
-        status: "approved"
-      })
-      .eq("id", requestId)
-      .eq("status", "pending")
-      .select("id")
-      .maybeSingle<{ id: string }>();
+    const updatedRequestId = await approvePendingCloseRequestForRoom({
+      landlordId: profile.id,
+      requestId,
+      resolvedBy: profile.id,
+      roomId: room.id
+    });
 
-    if (requestError) {
-      if (isMissingRoomCloseRequestsTableError(requestError)) {
-        return { error: missingRoomCloseRequestsMigrationMessage() };
-      }
-
-      return { error: requestError.message };
-    }
-
-    if (!updatedRequest) {
+    if (!updatedRequestId) {
       return { error: "Yêu cầu báo chốt này đã được xử lý." };
     }
 

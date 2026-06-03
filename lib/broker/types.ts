@@ -12,7 +12,13 @@ import type {
 export type BrokerVisibleRoomStatus = Extract<RoomStatus, "available" | "coming_soon">;
 export type BoundaryMode = "old" | "new";
 export type BrokerPostChannel = "chotot" | "mogi" | "facebook" | "zalo";
-export type RoomCloseRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type RoomCloseRequestStatus =
+  | "pending"
+  | "approved"
+  | "confirmed"
+  | "completed"
+  | "rejected"
+  | "cancelled";
 
 export type BrokerLandlordContact = {
   id: string;
