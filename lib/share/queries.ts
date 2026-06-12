@@ -13,68 +13,6 @@ import type {
 
 const SELLABLE_STATUSES = ["available", "coming_soon"] satisfies RoomStatus[];
 
-const SHARE_IMAGE_SELECT =
-  "id, image_url, storage_path, source_type, image_type, sort_order, is_cover, created_at";
-
-const SHARE_ROOM_SELECT = [
-  "id",
-  "building_id",
-  "room_code",
-  "title",
-  "floor",
-  "area_m2",
-  "rent_price",
-  "deposit_amount",
-  "max_people",
-  "status",
-  "available_from",
-  "commission",
-  "min_lease_months",
-  "fee_mode",
-  "room_layouts",
-  "description",
-  "strengths",
-  "weaknesses",
-  "room_drive_folder_url",
-  "cover_image_url",
-  "public_slug",
-  "visibility",
-  "updated_at",
-  "room_fees(*)",
-  "room_features(*)",
-  `room_images(${SHARE_IMAGE_SELECT})`
-].join(", ");
-
-const SHARE_BUILDING_BASE_SELECT = [
-  "id",
-  "landlord_id",
-  "name",
-  "address",
-  "ward",
-  "district",
-  "city",
-  "description",
-  "common_amenities",
-  "house_rules",
-  "building_drive_folder_url",
-  "cover_image_url",
-  "public_slug",
-  "visibility",
-  "updated_at",
-  "building_fees(*)",
-  `building_images(${SHARE_IMAGE_SELECT})`
-].join(", ");
-
-const SHARE_BUILDING_SELECT = [
-  SHARE_BUILDING_BASE_SELECT,
-  `rooms(${SHARE_ROOM_SELECT})`
-].join(", ");
-
-const SHARE_ROOM_DETAIL_SELECT = [
-  SHARE_ROOM_SELECT,
-  `buildings!inner(${SHARE_BUILDING_BASE_SELECT})`
-].join(", ");
-
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 type ShareImageRow = ShareImage;
@@ -94,8 +32,33 @@ type ShareBuildingRow = Omit<
   rooms?: ShareRoomRow[] | null;
 };
 
-type ShareRoomDetailRow = ShareRoomRow & {
-  buildings: ShareBuildingRow | ShareBuildingRow[] | null;
+type PublicLandlordShareRpcResult = {
+  landlord: ShareLandlord;
+  buildings: ShareBuildingRow[];
+};
+
+type PublicBuildingShareRpcResult = {
+  landlord: ShareLandlord | null;
+  building: ShareBuildingRow;
+};
+
+type PublicRoomShareRpcResult =
+  | {
+      unavailable: true;
+    }
+  | {
+      unavailable: false;
+      landlord: ShareLandlord | null;
+      building: ShareBuildingRow;
+      room: ShareRoomRow;
+    };
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseRpcResult<T>(value: unknown): T | null {
+  return isObject(value) ? (value as T) : null;
 };
 
 function firstRelation<T>(value: T | T[] | null | undefined) {
@@ -198,63 +161,33 @@ async function normalizeBuilding(
   };
 }
 
-async function getLandlordById(supabase: SupabaseServerClient, landlordId: string) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, public_slug")
-    .eq("id", landlordId)
-    .eq("role", "landlord")
-    .eq("status", "active")
-    .maybeSingle<ShareLandlord>();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data;
-}
-
 export async function getLandlordSharePageData(
   landlordSlug: string
 ): Promise<LandlordSharePageData | null> {
   const supabase = await createClient();
-  const { data: landlord, error: landlordError } = await supabase
-    .from("profiles")
-    .select("id, full_name, public_slug")
-    .eq("public_slug", landlordSlug)
-    .eq("role", "landlord")
-    .eq("status", "active")
-    .maybeSingle<ShareLandlord>();
-
-  if (landlordError) {
-    throw new Error(landlordError.message);
-  }
-
-  if (!landlord) {
-    return null;
-  }
-
-  const { data, error } = await supabase
-    .from("buildings")
-    .select(SHARE_BUILDING_SELECT)
-    .eq("landlord_id", landlord.id)
-    .eq("visibility", "visible")
-    .eq("rooms.visibility", "visible")
-    .in("rooms.status", SELLABLE_STATUSES)
-    .order("updated_at", { ascending: false })
-    .returns<ShareBuildingRow[]>();
+  const { data, error } = await supabase.rpc("get_public_landlord_share", {
+    landlord_slug: landlordSlug
+  });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const buildings = await Promise.all((data ?? []).map((row) => normalizeBuilding(supabase, row)));
+  const parsed = parseRpcResult<PublicLandlordShareRpcResult>(data);
+
+  if (!parsed) {
+    return null;
+  }
+
+  const buildings = await Promise.all(
+    (parsed.buildings ?? []).map((row) => normalizeBuilding(supabase, row))
+  );
 
   return {
     available_rooms: buildings.reduce((total, building) => total + building.available_rooms, 0),
     buildings,
     coming_soon_rooms: buildings.reduce((total, building) => total + building.coming_soon_rooms, 0),
-    landlord,
+    landlord: parsed.landlord,
     total_sellable_rooms: buildings.reduce((total, building) => total + building.rooms.length, 0),
     visible_buildings: buildings.length
   };
@@ -264,69 +197,55 @@ export async function getBuildingSharePageData(
   buildingSlug: string
 ): Promise<BuildingSharePageData | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("buildings")
-    .select(SHARE_BUILDING_SELECT)
-    .eq("public_slug", buildingSlug)
-    .eq("visibility", "visible")
-    .eq("rooms.visibility", "visible")
-    .in("rooms.status", SELLABLE_STATUSES)
-    .maybeSingle<ShareBuildingRow>();
+  const { data, error } = await supabase.rpc("get_public_building_share", {
+    building_slug: buildingSlug
+  });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  if (!data) {
+  const parsed = parseRpcResult<PublicBuildingShareRpcResult>(data);
+
+  if (!parsed) {
     return null;
   }
 
-  const [building, landlord] = await Promise.all([
-    normalizeBuilding(supabase, data),
-    getLandlordById(supabase, data.landlord_id)
-  ]);
+  const building = await normalizeBuilding(supabase, parsed.building);
 
-  return { building, landlord };
+  return { building, landlord: parsed.landlord };
 }
 
 export async function getRoomSharePageData(roomSlug: string): Promise<RoomSharePageData | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("rooms")
-    .select(SHARE_ROOM_DETAIL_SELECT)
-    .eq("public_slug", roomSlug)
-    .maybeSingle<ShareRoomDetailRow>();
+  const { data, error } = await supabase.rpc("get_public_room_share", {
+    room_slug: roomSlug
+  });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  if (!data) {
+  const parsed = parseRpcResult<PublicRoomShareRpcResult>(data);
+
+  if (!parsed) {
     return null;
   }
 
-  const buildingRow = firstRelation(data.buildings);
-
-  if (!buildingRow) {
-    return null;
-  }
-
-  if (!isSellableRoom(data) || buildingRow.visibility !== "visible") {
+  if (parsed.unavailable) {
     return { unavailable: true };
   }
 
-  const building = await normalizeBuilding(supabase, {
-    ...buildingRow,
-    rooms: []
-  });
-  const [room, landlord] = await Promise.all([
-    normalizeRoom(supabase, data, building.building_fees),
-    getLandlordById(supabase, building.landlord_id)
-  ]);
+  if (!isSellableRoom(parsed.room) || parsed.building.visibility !== "visible") {
+    return { unavailable: true };
+  }
+
+  const building = await normalizeBuilding(supabase, parsed.building);
+  const room = await normalizeRoom(supabase, parsed.room, building.building_fees);
 
   return {
     building,
-    landlord,
+    landlord: parsed.landlord,
     room,
     unavailable: false
   };
