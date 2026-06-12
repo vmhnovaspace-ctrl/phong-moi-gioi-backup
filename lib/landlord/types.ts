@@ -14,6 +14,12 @@ export type Building = {
   landlord_id: string;
   name: string;
   address: string;
+  old_address: string | null;
+  old_ward: string | null;
+  old_district: string | null;
+  new_address: string | null;
+  new_ward: string | null;
+  new_district: string | null;
   ward: string | null;
   district: string | null;
   city: string;
@@ -35,6 +41,18 @@ export type Building = {
   updated_at: string;
 };
 
+export type BuildingImage = {
+  id: string;
+  building_id: string;
+  image_url: string;
+  storage_path: string | null;
+  source_type: ImageSourceType;
+  image_type: "main" | "room" | "bathroom" | "kitchen" | "balcony" | "building" | "other";
+  sort_order: number;
+  is_cover: boolean;
+  created_at: string;
+};
+
 export type Room = {
   id: string;
   building_id: string;
@@ -50,6 +68,7 @@ export type Room = {
   commission: string | null;
   min_lease_months: number | null;
   fee_mode: FeeMode;
+  room_layouts: string[] | null;
   description: string | null;
   strengths: string | null;
   weaknesses: string | null;
@@ -103,6 +122,8 @@ export type RoomFeature = {
   is_furnished: boolean;
   has_parking: boolean;
   has_security: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type RoomImage = {
@@ -138,6 +159,7 @@ export type RoomWithBuilding = Room & {
 
 export type BuildingDetail = BuildingSummary & {
   building_fees: BuildingFee | null;
+  images: BuildingImage[];
   rooms: RoomListItem[];
   rented_rooms: number;
 };
@@ -161,6 +183,7 @@ export type LandlordRoomCloseRequest = {
   updated_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
+  landlord_seen_at: string | null;
   broker: {
     id: string;
     full_name: string;
@@ -192,6 +215,7 @@ export type SellListRoom = RoomWithBuilding & {
 export type SellListClosedRoom = SellListRoom & {
   closed_at: string;
   closed_from_log: boolean;
+  status_log_id: string | null;
 };
 
 export type SellListDashboard = {
@@ -199,7 +223,18 @@ export type SellListDashboard = {
     building: Building;
     rooms: SellListRoom[];
   }>;
-  recently_closed: SellListClosedRoom[];
+  closed_rooms: SellListClosedRoom[];
+};
+
+export type LandlordCloseToastItem = {
+  id: string;
+  room_id: string;
+  building_id: string;
+  room_code: string;
+  building_name: string;
+  broker_name: string | null;
+  status: RoomCloseRequestStatus;
+  created_at: string;
 };
 
 export type LandlordFormState = {

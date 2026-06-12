@@ -1,4 +1,9 @@
 import type { FeeFields, RoomFeature, RoomStatus } from "@/lib/landlord/types";
+import {
+  getEffectiveRoomLayoutValues,
+  getRoomAmenityLabels
+} from "@/lib/rooms/room-metadata";
+import { buildAbsoluteUrl } from "@/lib/site-url";
 
 type SlugSource = {
   public_slug?: string | null;
@@ -55,6 +60,7 @@ type RoomTemplateData = SlugSource & {
   room_drive_folder_url?: string | null;
   effective_fees?: Partial<FeeFields & { parking_fee?: string | null }> | null;
   features?: Partial<Omit<RoomFeature, "id" | "room_id">> | null;
+  room_layouts?: string[] | null;
 };
 
 type RoomTemplateBuilding = SlugSource & {
@@ -67,23 +73,6 @@ type RoomTemplateBuilding = SlugSource & {
 };
 
 const SELLABLE_STATUSES: RoomStatus[] = ["available", "coming_soon"];
-
-const featureLabels: Array<{ key: keyof Omit<RoomFeature, "id" | "room_id">; label: string }> = [
-  { key: "has_window", label: "Cửa sổ" },
-  { key: "has_balcony", label: "Ban công" },
-  { key: "has_private_bathroom", label: "WC riêng" },
-  { key: "has_private_kitchen", label: "Bếp riêng" },
-  { key: "has_washing_machine", label: "Máy giặt" },
-  { key: "has_elevator", label: "Thang máy" },
-  { key: "has_air_conditioner", label: "Máy lạnh" },
-  { key: "has_fridge", label: "Tủ lạnh" },
-  { key: "has_bed", label: "Giường" },
-  { key: "has_wardrobe", label: "Tủ đồ" },
-  { key: "allows_pet", label: "Cho nuôi pet" },
-  { key: "is_furnished", label: "Nội thất" },
-  { key: "has_parking", label: "Chỗ để xe" },
-  { key: "has_security", label: "An ninh" }
-];
 
 export function formatCurrencyVnd(value: number | string | null | undefined) {
   const numberValue = Number(value);
@@ -249,12 +238,13 @@ export function buildRoomShareText(
   const { building, room } = data;
   const areaName = cleanText(building.district || building.ward);
   const address = compactAddress(building.address, building.ward, building.district);
-  const features = activeFeatureLabels(room.features);
+  const roomLayouts = getEffectiveRoomLayoutValues(room.room_layouts, room.features);
+  const amenities = getRoomAmenityLabels(room.features);
   const feeLines = buildFeeLines(room.effective_fees);
-  const roomLine = compactInline([
-    room.room_code ? `Phòng ${room.room_code}` : "Phòng",
-    room.title
-  ], " - ");
+  const roomLine = compactInline(
+    [room.room_code ? `Phòng ${room.room_code}` : "Phòng", room.title],
+    " - "
+  );
 
   return compactBlocks([
     `CHO THUÊ PHÒNG${areaName ? ` ${areaName.toUpperCase()}` : ""}`,
@@ -277,7 +267,12 @@ export function buildRoomShareText(
       cleanText(room.commission) ? `Hoa hồng: ${cleanText(room.commission)}` : null
     ]),
     cleanText(room.description) ? compactLines(["Mô tả:", cleanText(room.description)]) : null,
-    features.length > 0 ? compactLines(["Tiện ích:", ...features.map((feature) => `- ${feature}`)]) : null,
+    roomLayouts.length > 0
+      ? compactLines(["Dạng phòng:", ...roomLayouts.map((layout) => `- ${layout}`)])
+      : null,
+    amenities.length > 0
+      ? compactLines(["Tiện ích:", ...amenities.map((feature) => `- ${feature}`)])
+      : null,
     feeLines.length > 0 ? compactLines(["Chi phí:", ...feeLines.map((fee) => `- ${fee}`)]) : null,
     cleanText(room.strengths) ? compactLines(["Điểm nổi bật:", cleanText(room.strengths)]) : null,
     compactLines(["Xem ảnh + chi tiết cập nhật realtime:", absoluteShareUrl(baseUrl, `/r/${room.public_slug ?? ""}`)]),
@@ -432,16 +427,6 @@ function buildFeeLines(fees: Partial<FeeFields & { parking_fee?: string | null }
   ].filter((line): line is string => Boolean(cleanText(line)));
 }
 
-function activeFeatureLabels(features: RoomTemplateData["features"]) {
-  if (!features) {
-    return [];
-  }
-
-  return featureLabels
-    .filter((feature) => Boolean(features[feature.key]))
-    .map((feature) => feature.label);
-}
-
 function isSellableRoom(room: LandlordTemplateRoom) {
   return room.visibility !== "hidden" && SELLABLE_STATUSES.includes(room.status);
 }
@@ -451,16 +436,7 @@ function buildingDisplayName(building: LandlordTemplateBuilding) {
 }
 
 function absoluteShareUrl(baseUrl: string, path: string) {
-  const normalizedBase =
-    baseUrl ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (typeof window !== "undefined" ? window.location.origin : "");
-
-  try {
-    return new URL(path, normalizedBase.endsWith("/") ? normalizedBase : `${normalizedBase}/`).toString();
-  } catch {
-    return path;
-  }
+  return buildAbsoluteUrl(path, baseUrl);
 }
 
 function compactBlocks(blocks: Array<string | null | undefined>) {

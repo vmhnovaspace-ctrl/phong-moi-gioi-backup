@@ -1,9 +1,12 @@
 import { roomSortCompare } from "@/lib/landlord/format";
+import { normalizeRoomLayoutValues } from "@/lib/rooms/room-metadata";
 import type {
   Building,
   BuildingDetail,
   BuildingFee,
+  BuildingImage,
   BuildingSummary,
+  LandlordCloseToastItem,
   LandlordRoomCloseRequest,
   Room,
   RoomFeature,
@@ -25,7 +28,8 @@ type BuildingWithRoomsRow = Building & {
 
 type BuildingDetailRow = Building & {
   building_fees: BuildingFee[] | null;
-  rooms: Array<Room & { room_images: Array<Pick<RoomImage, "id">> | null }> | null;
+  building_images: BuildingImage[] | null;
+  rooms: Array<(Omit<Room, "room_layouts"> & { room_layouts?: string[] | null }) & { room_images: Array<Pick<RoomImage, "id">> | null }> | null;
 };
 
 type RoomWithBuildingRow = Room & {
@@ -47,14 +51,23 @@ type LandlordRoomCloseRequestRow = Omit<LandlordRoomCloseRequest, "broker"> & {
     | null;
 };
 
+type LandlordRoomCloseRequestRowWithoutSeen = Omit<
+  LandlordRoomCloseRequestRow,
+  "landlord_seen_at"
+>;
+
 const LANDLORD_BUILDING_SUMMARY_SELECT =
   "id, landlord_id, name, address, ward, district, city, latitude, longitude, formatted_address, google_place_id, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, zalo_group_url, zalo_group_name, cover_image_url, public_slug, visibility, created_at, updated_at, rooms(id, status)";
 const LANDLORD_BUILDING_SUMMARY_SELECT_FALLBACK =
   "id, landlord_id, name, address, ward, district, city, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, cover_image_url, public_slug, visibility, created_at, updated_at, rooms(id, status)";
+const LANDLORD_ROOM_SELECT =
+  "id, building_id, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, fee_mode, room_layouts, description, strengths, weaknesses, room_drive_folder_url, cover_image_url, public_slug, visibility, created_at, updated_at";
+const LANDLORD_ROOM_SELECT_WITHOUT_LAYOUTS =
+  "id, building_id, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, fee_mode, description, strengths, weaknesses, room_drive_folder_url, cover_image_url, public_slug, visibility, created_at, updated_at";
 const LANDLORD_BUILDING_DETAIL_SELECT =
-  "id, landlord_id, name, address, ward, district, city, latitude, longitude, formatted_address, google_place_id, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, zalo_group_url, zalo_group_name, cover_image_url, public_slug, visibility, created_at, updated_at, building_fees(*), rooms(*, room_images(id))";
+  `id, landlord_id, name, address, ward, district, city, latitude, longitude, formatted_address, google_place_id, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, zalo_group_url, zalo_group_name, cover_image_url, public_slug, visibility, created_at, updated_at, building_fees(*), building_images(*), rooms(${LANDLORD_ROOM_SELECT}, room_images(id))`;
 const LANDLORD_BUILDING_DETAIL_SELECT_FALLBACK =
-  "id, landlord_id, name, address, ward, district, city, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, cover_image_url, public_slug, visibility, created_at, updated_at, building_fees(*), rooms(*, room_images(id))";
+  `id, landlord_id, name, address, ward, district, city, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, cover_image_url, public_slug, visibility, created_at, updated_at, building_fees(*), rooms(${LANDLORD_ROOM_SELECT_WITHOUT_LAYOUTS}, room_images(id))`;
 
 function isMissingMapColumnError(error: { message?: string; code?: string }) {
   const message = error.message?.toLowerCase() ?? "";
@@ -70,9 +83,27 @@ function isMissingMapColumnError(error: { message?: string; code?: string }) {
   );
 }
 
+function isMissingRoomLayoutsColumnError(error: { message?: string; code?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+
+  return (
+    error.code === "42703" ||
+    error.code === "PGRST204" ||
+    error.code === "PGRST205" ||
+    message.includes("room_layouts") ||
+    message.includes("schema cache")
+  );
+}
+
 function withMapFieldDefaults<T extends Partial<Building>>(building: T): T & Building {
   return {
     ...building,
+    old_address: building.address ?? null,
+    old_ward: building.ward ?? null,
+    old_district: building.district ?? null,
+    new_address: null,
+    new_ward: null,
+    new_district: null,
     latitude: building.latitude ?? null,
     longitude: building.longitude ?? null,
     formatted_address: building.formatted_address ?? null,
@@ -103,6 +134,13 @@ function firstRelation<T>(value: T | T[] | null | undefined) {
 
 function firstFee(value: BuildingFee[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : null;
+}
+
+function normalizeRoomLayouts<T extends { room_layouts?: string[] | null | undefined }>(room: T): T & { room_layouts: string[] } {
+  return {
+    ...room,
+    room_layouts: normalizeRoomLayoutValues(Array.isArray(room.room_layouts) ? room.room_layouts : [])
+  };
 }
 
 export async function getLandlordBuildingSummaries(landlordId: string) {
@@ -156,7 +194,7 @@ export async function getLandlordBuildingDetail(buildingId: string, landlordId: 
     .eq("landlord_id", landlordId)
     .maybeSingle<BuildingDetailRow>();
 
-  if (error && isMissingMapColumnError(error)) {
+  if (error && (isMissingMapColumnError(error) || isMissingRoomLayoutsColumnError(error))) {
     const fallback = await supabase
       .from("buildings")
       .select(LANDLORD_BUILDING_DETAIL_SELECT_FALLBACK)
@@ -176,15 +214,17 @@ export async function getLandlordBuildingDetail(buildingId: string, landlordId: 
   }
 
   const rooms = (data.rooms ?? []).map(({ room_images, ...room }) => ({
-    ...room,
+    ...normalizeRoomLayouts(room),
     image_count: room_images?.length ?? 0
   })) satisfies RoomListItem[];
+  const images = data.building_images ?? [];
 
   return {
     ...withMapFieldDefaults(data),
     available_rooms: rooms.filter((room) => room.status === "available").length,
     building_fees: firstFee(data.building_fees),
     coming_soon_rooms: rooms.filter((room) => room.status === "coming_soon").length,
+    images,
     rented_rooms: rooms.filter((room) => room.status === "rented").length,
     rooms: rooms.sort(roomSortCompare),
     total_rooms: rooms.length
@@ -209,12 +249,23 @@ export async function getLandlordBuilding(buildingId: string, landlordId: string
 
 export async function getLandlordRoom(roomId: string, landlordId: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("rooms")
-    .select("*, buildings!inner(*, building_fees(*))")
+    .select(`${LANDLORD_ROOM_SELECT}, buildings!inner(*, building_fees(*))`)
     .eq("id", roomId)
     .eq("buildings.landlord_id", landlordId)
     .maybeSingle<RoomWithBuildingRow>();
+
+  if (error && isMissingRoomLayoutsColumnError(error)) {
+    const fallback = await supabase
+      .from("rooms")
+      .select(`${LANDLORD_ROOM_SELECT_WITHOUT_LAYOUTS}, buildings!inner(*, building_fees(*))`)
+      .eq("id", roomId)
+      .eq("buildings.landlord_id", landlordId)
+      .maybeSingle<RoomWithBuildingRow>();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -231,6 +282,8 @@ export async function getLandlordRoom(roomId: string, landlordId: string) {
         .from("room_features")
         .select("*")
         .eq("room_id", roomId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
         .maybeSingle<RoomFeature>(),
       supabase.from("room_images").select("*").eq("room_id", roomId).order("sort_order").returns<RoomImage[]>()
     ]);
@@ -270,7 +323,7 @@ export async function getLandlordRoom(roomId: string, landlordId: string) {
   const buildingFees = firstFee(buildingFeesRows);
 
   return {
-    ...room,
+    ...normalizeRoomLayouts(room),
     building: withMapFieldDefaults(building),
     building_fees: buildingFees,
     effective_fees: room.fee_mode === "room_override" ? fees ?? null : buildingFees,
@@ -284,7 +337,7 @@ export async function getLandlordSellList(landlordId: string, buildingId?: strin
   const supabase = await createClient();
   let query = supabase
     .from("rooms")
-    .select("*, buildings!inner(*)")
+    .select(`${LANDLORD_ROOM_SELECT}, buildings!inner(*)`)
     .eq("buildings.landlord_id", landlordId)
     .in("status", ["available", "coming_soon"])
     .order("updated_at", { ascending: false });
@@ -293,7 +346,24 @@ export async function getLandlordSellList(landlordId: string, buildingId?: strin
     query = query.eq("building_id", buildingId);
   }
 
-  const { data, error } = await query.returns<Array<Room & { buildings: Building | Building[] }>>();
+  let { data, error } = await query.returns<Array<Room & { buildings: Building | Building[] }>>();
+
+  if (error && isMissingRoomLayoutsColumnError(error)) {
+    let fallbackQuery = supabase
+      .from("rooms")
+      .select(`${LANDLORD_ROOM_SELECT_WITHOUT_LAYOUTS}, buildings!inner(*)`)
+      .eq("buildings.landlord_id", landlordId)
+      .in("status", ["available", "coming_soon"])
+      .order("updated_at", { ascending: false });
+
+    if (buildingId) {
+      fallbackQuery = fallbackQuery.eq("building_id", buildingId);
+    }
+
+    const fallback = await fallbackQuery.returns<Array<(Omit<Room, "room_layouts"> & { room_layouts?: string[] | null }) & { buildings: Building | Building[] }>>();
+    data = fallback.data as Array<Room & { buildings: Building | Building[] }> | null;
+    error = fallback.error;
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -344,11 +414,11 @@ export async function getLandlordSellList(landlordId: string, buildingId?: strin
 
 export async function getLandlordSellDashboard(landlordId: string): Promise<SellListDashboard> {
   const groups = await getLandlordSellList(landlordId);
-  const recentlyClosed = await getRecentlyClosedSellRooms(landlordId);
+  const closedRooms = await getRecentlyClosedSellRooms(landlordId, 90);
 
   return {
     groups,
-    recently_closed: recentlyClosed
+    closed_rooms: closedRooms
   };
 }
 
@@ -405,16 +475,32 @@ async function getPendingCloseRequestsByRoom(landlordId: string, roomIds: string
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("room_close_requests")
     .select(
-      "id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at, resolved_by, broker:profiles!room_close_requests_broker_id_fkey(id, full_name, phone)"
+      "id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at, resolved_by, landlord_seen_at, broker:profiles!room_close_requests_broker_id_fkey(id, full_name, phone)"
     )
     .eq("landlord_id", landlordId)
     .eq("status", "pending")
     .in("room_id", uniqueRoomIds)
     .order("created_at", { ascending: false })
     .returns<LandlordRoomCloseRequestRow[]>();
+
+  if (error && isMissingLandlordSeenColumnError(error)) {
+    const fallback = await supabase
+      .from("room_close_requests")
+      .select(
+        "id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at, resolved_by, broker:profiles!room_close_requests_broker_id_fkey(id, full_name, phone)"
+      )
+      .eq("landlord_id", landlordId)
+      .eq("status", "pending")
+      .in("room_id", uniqueRoomIds)
+      .order("created_at", { ascending: false })
+      .returns<LandlordRoomCloseRequestRowWithoutSeen[]>();
+
+    data = (fallback.data ?? []).map((row) => ({ ...row, landlord_seen_at: null }));
+    error = fallback.error;
+  }
 
   if (error) {
     if (isMissingRoomCloseRequestsTableError(error)) {
@@ -439,18 +525,18 @@ async function getPendingCloseRequestsByRoom(landlordId: string, roomIds: string
   return pending;
 }
 
-async function getRecentlyClosedSellRooms(landlordId: string): Promise<SellListClosedRoom[]> {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+async function getRecentlyClosedSellRooms(landlordId: string, periodDays: number): Promise<SellListClosedRoom[]> {
+  const cutoff = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("room_status_logs")
-    .select("created_at, rooms!inner(*, buildings!inner(*))")
+    .select("id, created_at, rooms!inner(*, buildings!inner(*))")
     .in("old_status", ["available", "coming_soon"])
-    .eq("new_status", "rented")
+    .in("new_status", ["reserved", "rented"])
     .gte("created_at", cutoff)
     .eq("rooms.buildings.landlord_id", landlordId)
     .order("created_at", { ascending: false })
-    .returns<Array<{ created_at: string; rooms: (Room & { buildings: Building | Building[] }) | Array<Room & { buildings: Building | Building[] }> }>>();
+    .returns<Array<{ id: string; created_at: string; rooms: (Room & { buildings: Building | Building[] }) | Array<Room & { buildings: Building | Building[] }> }>>();
 
   if (!error) {
     const rows = (data ?? []).flatMap((log) => {
@@ -474,18 +560,19 @@ async function getRecentlyClosedSellRooms(landlordId: string): Promise<SellListC
           features: null,
           images: [],
           last_sell_event_at: null,
-          pending_close_request: null
+          pending_close_request: null,
+          status_log_id: log.id
         } satisfies SellListClosedRoom
       ];
     });
-    return hydrateClosedRoomEvents(landlordId, rows);
+    return hydrateClosedRoomEvents(landlordId, dedupeClosedRooms(rows));
   }
 
   // Fallback for environments where the room_status_logs relation cannot be queried through PostgREST.
   const fallback = await supabase
     .from("rooms")
     .select("*, buildings!inner(*)")
-    .eq("status", "rented")
+    .in("status", ["reserved", "rented"])
     .gte("updated_at", cutoff)
     .eq("buildings.landlord_id", landlordId)
     .order("updated_at", { ascending: false })
@@ -515,12 +602,103 @@ async function getRecentlyClosedSellRooms(landlordId: string): Promise<SellListC
         features: null,
         images: [],
         last_sell_event_at: null,
-        pending_close_request: null
+        pending_close_request: null,
+        status_log_id: null
       } satisfies SellListClosedRoom
     ];
   });
 
-  return hydrateClosedRoomEvents(landlordId, rows);
+  return hydrateClosedRoomEvents(landlordId, dedupeClosedRooms(rows));
+}
+
+function dedupeClosedRooms(rooms: SellListClosedRoom[]) {
+  const newestByRoom = new Map<string, SellListClosedRoom>();
+
+  for (const room of rooms) {
+    const current = newestByRoom.get(room.id);
+
+    if (!current || new Date(room.closed_at).getTime() > new Date(current.closed_at).getTime()) {
+      newestByRoom.set(room.id, room);
+    }
+  }
+
+  return [...newestByRoom.values()].sort(
+    (left, right) => new Date(right.closed_at).getTime() - new Date(left.closed_at).getTime()
+  );
+}
+
+export async function getLandlordCloseToastItems(landlordId: string): Promise<LandlordCloseToastItem[]> {
+  const supabase = await createClient();
+  let { data, error } = await supabase
+    .from("room_close_requests")
+    .select("id, room_id, building_id:rooms!inner(building_id), status, created_at, landlord_seen_at, rooms!inner(room_code, buildings!inner(id, name, landlord_id)), broker:profiles!room_close_requests_broker_id_fkey(full_name)")
+    .eq("landlord_id", landlordId)
+    .eq("status", "pending")
+    .is("landlord_seen_at", null)
+    .order("created_at", { ascending: false })
+    .limit(3)
+    .returns<Array<{
+      id: string;
+      room_id: string;
+      status: string;
+      created_at: string;
+      landlord_seen_at: string | null;
+      broker: { full_name: string | null } | { full_name: string | null }[] | null;
+      rooms:
+        | { room_code: string | null; building_id: string; buildings: { id: string; name: string; landlord_id: string } | Array<{ id: string; name: string; landlord_id: string }> }
+        | Array<{ room_code: string | null; building_id: string; buildings: { id: string; name: string; landlord_id: string } | Array<{ id: string; name: string; landlord_id: string }> }>;
+    }>>();
+
+  if (error && isMissingLandlordSeenColumnError(error)) {
+    const fallback = await supabase
+      .from("room_close_requests")
+      .select("id, room_id, building_id:rooms!inner(building_id), status, created_at, rooms!inner(room_code, buildings!inner(id, name, landlord_id)), broker:profiles!room_close_requests_broker_id_fkey(full_name)")
+      .eq("landlord_id", landlordId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(3)
+      .returns<Array<{
+        id: string;
+        room_id: string;
+        status: string;
+        created_at: string;
+        broker: { full_name: string | null } | { full_name: string | null }[] | null;
+        rooms:
+          | { room_code: string | null; building_id: string; buildings: { id: string; name: string; landlord_id: string } | Array<{ id: string; name: string; landlord_id: string }> }
+          | Array<{ room_code: string | null; building_id: string; buildings: { id: string; name: string; landlord_id: string } | Array<{ id: string; name: string; landlord_id: string }> }>;
+      }>>();
+
+    data = (fallback.data ?? []).map((row) => ({ ...row, landlord_seen_at: null }));
+    error = fallback.error;
+  }
+
+  if (error) {
+    if (isMissingRoomCloseRequestsTableError(error)) {
+      return [];
+    }
+
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).flatMap((row) => {
+    const room = firstRelation(row.rooms);
+    const building = firstRelation(room?.buildings);
+
+    if (!room || !building || building.landlord_id !== landlordId) {
+      return [];
+    }
+
+    return [{
+      id: row.id,
+      room_id: row.room_id,
+      building_id: building.id,
+      room_code: room.room_code ?? "",
+      building_name: building.name,
+      broker_name: firstRelation(row.broker)?.full_name ?? null,
+      status: row.status as LandlordCloseToastItem["status"],
+      created_at: row.created_at
+    } satisfies LandlordCloseToastItem];
+  });
 }
 
 async function hydrateClosedRoomEvents(landlordId: string, rooms: SellListClosedRoom[]) {
@@ -542,6 +720,17 @@ function isMissingSellEventsTableError(error: { message?: string; code?: string 
     error.code === "42P01" ||
     error.code === "PGRST205" ||
     message.includes("room_sell_events") ||
+    message.includes("schema cache")
+  );
+}
+
+function isMissingLandlordSeenColumnError(error: { message?: string; code?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+
+  return (
+    error.code === "42703" ||
+    error.code === "PGRST204" ||
+    message.includes("landlord_seen_at") ||
     message.includes("schema cache")
   );
 }

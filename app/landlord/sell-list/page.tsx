@@ -17,17 +17,19 @@ export default async function LandlordSellListPage() {
         <ArrowLeft className="size-4" aria-hidden />
         Quay lại căn nhà
       </Link>
+
       <div>
         <h2 className="text-xl font-bold text-slate-950">Danh sách phòng sell</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Theo dõi phòng đang sell và xác nhận phòng đã chốt.
+          Theo dõi phòng đang sell, danh sách đã chốt và soạn tin gửi Zalo nhanh.
         </p>
       </div>
+
       <SellListView
         groups={dashboard.groups}
         landlord={profile}
         mode="all"
-        recentlyClosed={dashboard.recently_closed}
+        recentlyClosed={dashboard.closed_rooms}
       />
     </div>
   );

@@ -1,0 +1,3 @@
+﻿Codex 9Router test OK
+Model should be cx/gpt-5.4-mini
+Created by Codex CLI through 9Router

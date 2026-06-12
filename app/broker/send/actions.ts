@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/profile";
 import { getBrokerRoom } from "@/lib/broker/queries";
-import { getSiteUrl } from "@/lib/env";
+import { buildAbsoluteUrl } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
 
 export type CreateCustomerRoomPackageInput = {
@@ -92,7 +92,7 @@ export async function createCustomerRoomPackage(
       return { error: formatPackageError(itemError.message), ok: false };
     }
 
-    const packageUrl = `${getSiteUrl().replace(/\/$/, "")}/p/${packageRow.public_slug}`;
+    const packageUrl = buildAbsoluteUrl(`/p/${packageRow.public_slug}`);
     const message = buildZaloMessage(customerName, packageUrl);
 
     revalidatePath("/broker/send");

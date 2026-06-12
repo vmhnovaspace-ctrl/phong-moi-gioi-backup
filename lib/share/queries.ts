@@ -31,6 +31,7 @@ const SHARE_ROOM_SELECT = [
   "commission",
   "min_lease_months",
   "fee_mode",
+  "room_layouts",
   "description",
   "strengths",
   "weaknesses",
@@ -105,6 +106,20 @@ function firstRelation<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
+function latestRelation<T extends { updated_at?: string | null }>(value: T | T[] | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  return [...value].sort((a, b) => {
+    return new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime();
+  })[0] ?? null;
+}
+
 function isSellableRoom(room: Pick<ShareRoomRow, "status" | "visibility">) {
   return room.visibility === "visible" && (SELLABLE_STATUSES as RoomStatus[]).includes(room.status);
 }
@@ -143,7 +158,7 @@ async function normalizeRoom(
 ): Promise<ShareRoom> {
   const { room_fees: feeRows, room_features: featureRows, room_images: imageRows, ...room } = row;
   const fees = firstRelation(feeRows);
-  const features = firstRelation(featureRows);
+  const features = latestRelation(featureRows);
 
   return {
     ...room,

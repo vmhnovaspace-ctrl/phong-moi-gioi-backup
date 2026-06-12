@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/profile";
 import { getBrokerRoom } from "@/lib/broker/queries";
-import { getSiteUrl } from "@/lib/env";
+import { buildAbsoluteUrl } from "@/lib/site-url";
 import { createClient } from "@/lib/supabase/server";
 
 type CreatePackageRequest = {
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       return jsonError(formatPackageError(itemError.message));
     }
 
-    const packageUrl = `${getSiteUrl().replace(/\/$/, "")}/p/${packageRow.public_slug}`;
+    const packageUrl = buildAbsoluteUrl(`/p/${packageRow.public_slug}`);
     const message = buildZaloMessage(customerName, packageUrl);
 
     revalidatePath("/broker/send");

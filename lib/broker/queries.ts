@@ -24,6 +24,7 @@ import type {
   CustomerRoomPackageEvent
 } from "@/lib/broker/types";
 import type { Building, BuildingFee, Room, RoomFeature, RoomFee, RoomImage } from "@/lib/landlord/types";
+import { normalizeRoomLayoutValues } from "@/lib/rooms/room-metadata";
 import { createClient } from "@/lib/supabase/server";
 import { matchesLocationFilter } from "@/src/lib/location-utils";
 
@@ -66,6 +67,7 @@ type BrokerRoomRow = Pick<
   | "updated_at"
 > & {
   buildings: BrokerBuildingRow | BrokerBuildingRow[];
+  room_layouts?: string[] | null;
 };
 
 type BrokerInventoryRoomRow = BrokerRoomRow & {
@@ -77,30 +79,14 @@ type BrokerInventoryRoomRow = BrokerRoomRow & {
         >
       >
     | null;
-  room_features:
-    | Array<
-        Pick<
-          RoomFeature,
-          | "allows_pet"
-          | "has_air_conditioner"
-          | "has_balcony"
-          | "has_bed"
-          | "has_elevator"
-          | "has_fridge"
-          | "has_washing_machine"
-          | "has_parking"
-          | "has_private_bathroom"
-          | "has_private_kitchen"
-          | "has_security"
-          | "has_wardrobe"
-          | "has_window"
-          | "is_furnished"
-        >
-      >
-    | null;
+  room_features: BrokerInventoryFeatureRow | BrokerInventoryFeatureRow[] | null;
 };
 
-type BrokerRoomDetailRow = Room & {
+type BrokerInventoryFeatureRow = BrokerInventoryRoom["features"] & {
+  updated_at?: string | null;
+};
+
+type BrokerRoomDetailRow = Omit<Room, "room_layouts"> & { room_layouts?: string[] | null } & {
   buildings:
     | (BrokerBuildingRow &
         Pick<
@@ -130,20 +116,28 @@ type CustomerPackageItemCountRow = { package_id: string };
 type CustomerPackageEventRow = CustomerRoomPackageEvent;
 type CustomerInterestRoomRow = Pick<CustomerRoomPackageEvent, "room_id" | "updated_at" | "created_at">;
 
+const BROKER_ROOM_LIST_SELECT =
+  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, room_layouts, description, strengths, weaknesses, updated_at";
+const BROKER_ROOM_LIST_SELECT_WITHOUT_LAYOUTS =
+  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at";
 const BROKER_INVENTORY_SELECT =
-  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at, buildings!inner(id, name, address, ward, district, city, landlord_id, latitude, longitude, formatted_address, google_place_id, google_maps_url), room_features(allows_pet, has_air_conditioner, has_balcony, has_bed, has_elevator, has_fridge, has_washing_machine, has_parking, has_private_bathroom, has_private_kitchen, has_security, has_wardrobe, has_window, is_furnished), room_images(id, image_url, storage_path, source_type, sort_order, is_cover)";
+  `${BROKER_ROOM_LIST_SELECT}, buildings!inner(id, name, address, ward, district, city, landlord_id, latitude, longitude, formatted_address, google_place_id, google_maps_url), room_features(allows_pet, has_air_conditioner, has_balcony, has_bed, has_elevator, has_fridge, has_washing_machine, has_parking, has_private_bathroom, has_private_kitchen, has_security, has_wardrobe, has_window, is_furnished, updated_at), room_images(id, image_url, storage_path, source_type, sort_order, is_cover)`;
 const BROKER_INVENTORY_SELECT_FALLBACK =
-  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at, buildings!inner(id, name, address, ward, district, city, landlord_id, google_maps_url), room_features(allows_pet, has_air_conditioner, has_balcony, has_bed, has_elevator, has_fridge, has_washing_machine, has_parking, has_private_bathroom, has_private_kitchen, has_security, has_wardrobe, has_window, is_furnished), room_images(id, image_url, storage_path, source_type, sort_order, is_cover)";
+  `${BROKER_ROOM_LIST_SELECT_WITHOUT_LAYOUTS}, buildings!inner(id, name, address, ward, district, city, landlord_id, google_maps_url), room_features(allows_pet, has_air_conditioner, has_balcony, has_bed, has_elevator, has_fridge, has_washing_machine, has_parking, has_private_bathroom, has_private_kitchen, has_security, has_wardrobe, has_window, is_furnished, updated_at), room_images(id, image_url, storage_path, source_type, sort_order, is_cover)`;
 const BROKER_CLOSED_ROOM_SELECT =
-  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at, buildings!inner(id, name, address, ward, district, city, landlord_id, latitude, longitude, formatted_address, google_place_id, google_maps_url)";
+  `${BROKER_ROOM_LIST_SELECT}, buildings!inner(id, name, address, ward, district, city, landlord_id, latitude, longitude, formatted_address, google_place_id, google_maps_url)`;
 const BROKER_CLOSED_ROOM_SELECT_FALLBACK =
-  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, room_drive_folder_url, description, strengths, weaknesses, updated_at, buildings!inner(id, name, address, ward, district, city, landlord_id, google_maps_url)";
+  `${BROKER_ROOM_LIST_SELECT_WITHOUT_LAYOUTS}, buildings!inner(id, name, address, ward, district, city, landlord_id, google_maps_url)`;
 const BROKER_INVENTORY_PAGE_SIZE = 1000;
 
+const BROKER_ROOM_DETAIL_FIELDS =
+  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, fee_mode, room_drive_folder_url, room_layouts, description, strengths, weaknesses, public_slug, visibility, created_at, updated_at";
+const BROKER_ROOM_DETAIL_FIELDS_WITHOUT_LAYOUTS =
+  "id, building_id, cover_image_url, room_code, title, floor, area_m2, rent_price, deposit_amount, max_people, status, available_from, commission, min_lease_months, fee_mode, room_drive_folder_url, description, strengths, weaknesses, public_slug, visibility, created_at, updated_at";
 const BROKER_ROOM_DETAIL_SELECT =
-  "*, buildings!inner(id, name, address, ward, district, city, latitude, longitude, formatted_address, google_place_id, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, landlord_id, building_fees(*))";
+  `${BROKER_ROOM_DETAIL_FIELDS}, buildings!inner(id, name, address, ward, district, city, latitude, longitude, formatted_address, google_place_id, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, landlord_id, building_fees(*))`;
 const BROKER_ROOM_DETAIL_SELECT_FALLBACK =
-  "*, buildings!inner(id, name, address, ward, district, city, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, landlord_id, building_fees(*))";
+  `${BROKER_ROOM_DETAIL_FIELDS_WITHOUT_LAYOUTS}, buildings!inner(id, name, address, ward, district, city, google_maps_url, description, common_amenities, house_rules, building_drive_folder_url, landlord_id, building_fees(*))`;
 const BROKER_CLOSE_REQUEST_SELECT =
   "id, room_id, broker_id, landlord_id, status, broker_note, landlord_note, created_at, updated_at, resolved_at";
 const BROKER_CLOSE_REQUEST_SELECT_WITH_ACK = `${BROKER_CLOSE_REQUEST_SELECT}, broker_acknowledged_at`;
@@ -162,6 +156,20 @@ function firstRelation<T>(value: T | T[] | null | undefined) {
   }
 
   return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function latestRelation<T extends { updated_at?: string | null }>(value: T | T[] | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  return [...value].sort((a, b) => {
+    return new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime();
+  })[0] ?? null;
 }
 
 function firstFee(value: BuildingFee[] | null | undefined) {
@@ -215,6 +223,18 @@ function isBrokerClosedRequestStatus(status: BrokerRoomCloseRequestRow["status"]
   );
 }
 
+function isMissingRoomLayoutsColumnError(error: { message?: string; code?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+
+  return (
+    error.code === "42703" ||
+    error.code === "PGRST204" ||
+    error.code === "PGRST205" ||
+    message.includes("room_layouts") ||
+    message.includes("schema cache")
+  );
+}
+
 function getBrokerCloseRequestConfirmedAt(closeRequest: Pick<
   BrokerRoomCloseRequestRow,
   "resolved_at" | "updated_at" | "created_at"
@@ -241,7 +261,7 @@ async function getLandlordsById(ids: string[]) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, phone")
+    .select("id, full_name, phone, public_slug")
     .in("id", Array.from(new Set(ids)))
     .returns<BrokerProfileRow[]>();
 
@@ -267,6 +287,7 @@ function toBrokerRoom(
 
   return {
     ...room,
+    room_layouts: normalizeRoomLayoutValues(room.room_layouts ?? []),
     building: normalizedBuilding,
     landlord: landlords.get(normalizedBuilding.landlord_id) ?? null
   };
@@ -365,7 +386,7 @@ async function toBrokerInventoryRoom(
 
   return {
     ...room,
-    features: row.room_features?.[0] ?? null,
+    features: latestRelation(row.room_features) ?? null,
     thumbnail: image ? await signRoomThumbnail(image) : null
   } satisfies BrokerInventoryRoom;
 }
@@ -388,6 +409,10 @@ function filterInventoryRoom(room: BrokerInventoryRoom, filters: BrokerInventory
     return false;
   }
 
+  if (filters.landlordId && filters.landlordId !== room.building.landlord_id && filters.landlordId !== room.landlord?.id) {
+    return false;
+  }
+
   if (
     !matchesLocationFilter({
       geoMode: filters.boundaryMode === "new" ? "current" : "old",
@@ -402,7 +427,14 @@ function filterInventoryRoom(room: BrokerInventoryRoom, filters: BrokerInventory
   }
 
   if (filters.landlord) {
+    const normalizedLandlordFilter = filters.landlord.trim().toLowerCase();
+    const matchesExactLandlord =
+      normalizedLandlordFilter === room.landlord?.public_slug?.toLowerCase() ||
+      normalizedLandlordFilter === room.landlord?.id.toLowerCase() ||
+      normalizedLandlordFilter === room.building.landlord_id.toLowerCase();
+
     if (
+      !matchesExactLandlord &&
       !matchesBrokerLandlordSearch({
         input: filters.landlord,
         landlordName: room.landlord?.full_name,
@@ -503,7 +535,7 @@ async function fetchBrokerInventoryPage(from: number, to: number) {
     .range(from, to)
     .returns<BrokerInventoryRoomRow[]>();
 
-  if (error && isMissingMapColumnError(error)) {
+  if (error && (isMissingMapColumnError(error) || isMissingRoomLayoutsColumnError(error))) {
     const fallback = await supabase
       .from("rooms")
       .select(BROKER_INVENTORY_SELECT_FALLBACK)
@@ -546,14 +578,55 @@ async function fetchBrokerInventoryRows(limit?: number) {
   return rows;
 }
 
+async function fetchRoomLayoutsByIds(roomIds: string[]) {
+  if (roomIds.length === 0) {
+    return new Map<string, string[] | null>();
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("id, room_layouts")
+    .in("id", Array.from(new Set(roomIds)))
+    .returns<Array<{ id: string; room_layouts: string[] | null }>>();
+
+  if (error) {
+    if (isMissingRoomLayoutsColumnError(error)) {
+      return new Map<string, string[] | null>();
+    }
+
+    throw new Error(error.message);
+  }
+
+  return new Map(
+    (data ?? []).map((row) => [row.id, normalizeRoomLayoutValues(row.room_layouts ?? [])])
+  );
+}
+
 async function rowsToInventoryRooms(rows: BrokerInventoryRoomRow[]) {
   const landlordIds = rows
     .map((row) => firstRelation(row.buildings)?.landlord_id ?? null)
     .filter((value): value is string => Boolean(value));
   const landlords = await getLandlordsById(landlordIds);
   const rooms = await Promise.all(rows.map((row) => toBrokerInventoryRoom(row, landlords)));
+  const filteredRooms = rooms.filter((room): room is BrokerInventoryRoom => room !== null);
+  const missingRoomLayoutIds = filteredRooms
+    .filter((room) => !Array.isArray(room.room_layouts) || room.room_layouts.length === 0)
+    .map((room) => room.id);
 
-  return rooms.filter((room): room is BrokerInventoryRoom => room !== null);
+  if (missingRoomLayoutIds.length === 0) {
+    return filteredRooms;
+  }
+
+  const roomLayoutsById = await fetchRoomLayoutsByIds(missingRoomLayoutIds);
+
+  return filteredRooms.map((room) => ({
+    ...room,
+    room_layouts:
+      Array.isArray(room.room_layouts) && room.room_layouts.length > 0
+        ? normalizeRoomLayoutValues(room.room_layouts)
+        : roomLayoutsById.get(room.id) ?? []
+  }));
 }
 
 async function attachBrokerCloseRequests(rooms: BrokerInventoryRoom[], brokerId?: string) {
@@ -678,7 +751,7 @@ export async function getBrokerRoom(roomId: string, brokerId: string): Promise<B
     .in("status", ["available", "coming_soon"])
     .maybeSingle<BrokerRoomDetailRow>();
 
-  if (error && isMissingMapColumnError(error)) {
+  if (error && (isMissingMapColumnError(error) || isMissingRoomLayoutsColumnError(error))) {
     const fallback = await supabase
       .from("rooms")
       .select(BROKER_ROOM_DETAIL_SELECT_FALLBACK)
@@ -714,7 +787,13 @@ export async function getBrokerRoom(roomId: string, brokerId: string): Promise<B
     { data: closeRequest, error: closeRequestError }
   ] = await Promise.all([
     supabase.from("room_fees").select("*").eq("room_id", roomId).maybeSingle<RoomFee>(),
-    supabase.from("room_features").select("*").eq("room_id", roomId).maybeSingle<RoomFeature>(),
+    supabase
+      .from("room_features")
+      .select("*")
+      .eq("room_id", roomId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<RoomFeature>(),
     supabase.from("room_images").select("*").eq("room_id", roomId).order("sort_order").returns<RoomImage[]>(),
     supabase
       .from("profiles")
@@ -769,6 +848,7 @@ export async function getBrokerRoom(roomId: string, brokerId: string): Promise<B
 
   return {
     ...room,
+    room_layouts: normalizeRoomLayoutValues(Array.isArray(room.room_layouts) ? room.room_layouts : []),
     action: action ?? null,
     building,
     building_fees: buildingFees,
@@ -952,7 +1032,7 @@ export async function getBrokerHandledCustomerInterestRooms(
     .in("id", activeRoomIds)
     .returns<BrokerInventoryRoomRow[]>();
 
-  if (roomsError && isMissingMapColumnError(roomsError)) {
+  if (roomsError && (isMissingMapColumnError(roomsError) || isMissingRoomLayoutsColumnError(roomsError))) {
     const fallback = await supabase
       .from("rooms")
       .select(BROKER_INVENTORY_SELECT_FALLBACK)
@@ -1017,6 +1097,7 @@ function toBrokerClosedRoom(
 
   return {
     ...room,
+    room_layouts: normalizeRoomLayoutValues(Array.isArray(room.room_layouts) ? room.room_layouts : []),
     building: normalizedBuilding,
     close_request: {
       ...closeRequest,
@@ -1092,7 +1173,7 @@ export async function getBrokerClosedRooms(
     .in("id", roomIds)
     .returns<BrokerRoomRow[]>();
 
-  if (roomsError && isMissingMapColumnError(roomsError)) {
+  if (roomsError && (isMissingMapColumnError(roomsError) || isMissingRoomLayoutsColumnError(roomsError))) {
     const fallback = await supabase
       .from("rooms")
       .select(BROKER_CLOSED_ROOM_SELECT_FALLBACK)
@@ -1158,7 +1239,7 @@ export async function getBrokerActionRooms(brokerId: string): Promise<BrokerActi
     .in("id", roomIds)
     .returns<BrokerInventoryRoomRow[]>();
 
-  if (roomsError && isMissingMapColumnError(roomsError)) {
+  if (roomsError && (isMissingMapColumnError(roomsError) || isMissingRoomLayoutsColumnError(roomsError))) {
     const fallback = await supabase
       .from("rooms")
       .select(BROKER_INVENTORY_SELECT_FALLBACK)
@@ -1384,11 +1465,33 @@ export async function getPublicCustomerRoomPackage(
     return null;
   }
 
+  let roomLayoutsById = new Map<string, string[] | null>();
+  const roomIds = parsed.rooms.map((room) => room.id);
+
+  if (roomIds.length > 0) {
+    const { data: roomLayoutRows, error: roomLayoutsError } = await supabase
+      .from("rooms")
+      .select("id, room_layouts")
+      .in("id", roomIds)
+      .returns<Array<{ id: string; room_layouts: string[] | null }>>();
+
+    if (roomLayoutsError) {
+      if (!isMissingRoomLayoutsColumnError(roomLayoutsError)) {
+        throw new Error(roomLayoutsError.message);
+      }
+    } else {
+      roomLayoutsById = new Map(
+        (roomLayoutRows ?? []).map((row) => [row.id, Array.isArray(row.room_layouts) ? row.room_layouts : null])
+      );
+    }
+  }
+
   return {
     ...parsed,
     rooms: await Promise.all(
       parsed.rooms.map(async (room) => ({
         ...room,
+        room_layouts: room.room_layouts ?? roomLayoutsById.get(room.id) ?? null,
         images: await Promise.all(room.images.map(signPublicPackageImage))
       }))
     )
@@ -1483,6 +1586,9 @@ function normalizePublicPackageRoom(value: unknown): PublicCustomerRoomPackage["
     max_people: typeof raw.max_people === "number" ? raw.max_people : null,
     rent_price: typeof raw.rent_price === "number" ? raw.rent_price : 0,
     room_drive_folder_url: typeof raw.room_drive_folder_url === "string" ? raw.room_drive_folder_url : null,
+    room_layouts: Array.isArray(raw.room_layouts)
+      ? raw.room_layouts.filter((value): value is string => typeof value === "string")
+      : null,
     strengths: typeof raw.strengths === "string" ? raw.strengths : null,
     title: typeof raw.title === "string" ? raw.title : null
   };

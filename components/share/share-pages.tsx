@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Building2, ExternalLink, Home, MapPin } from "lucide-react";
+import { EmptyState } from "@/components/landlord/empty-state";
+import { StatusBadge } from "@/components/landlord/status-badge";
 import { CopyLinkButton } from "@/components/share/copy-link-button";
 import { CopyTextButton } from "@/components/share/copy-text-button";
 import { SafeImage } from "@/components/share/safe-image";
-import { EmptyState } from "@/components/landlord/empty-state";
-import { StatusBadge } from "@/components/landlord/status-badge";
 import { getSiteUrl } from "@/lib/env";
 import {
   feeRows,
@@ -13,37 +13,23 @@ import {
   formatDate,
   roomStatusLabels
 } from "@/lib/landlord/format";
-import type { RoomFeature } from "@/lib/landlord/types";
+import {
+  getEffectiveRoomLayoutValues,
+  getRoomAmenityLabels
+} from "@/lib/rooms/room-metadata";
 import type {
   BuildingSharePageData,
   LandlordSharePageData,
+  RoomSharePageData,
   ShareBuilding,
   ShareImage,
-  ShareRoom,
-  RoomSharePageData
+  ShareRoom
 } from "@/lib/share/types";
 import {
   buildBuildingShareText,
   buildLandlordShareText,
   buildRoomShareText
 } from "@/lib/share/templates";
-
-const featureLabels: Array<{ key: keyof Omit<RoomFeature, "id" | "room_id">; label: string }> = [
-  { key: "has_window", label: "Cửa sổ" },
-  { key: "has_balcony", label: "Ban công" },
-  { key: "has_private_bathroom", label: "WC riêng" },
-  { key: "has_private_kitchen", label: "Bếp riêng" },
-  { key: "has_washing_machine", label: "Máy giặt" },
-  { key: "has_elevator", label: "Thang máy" },
-  { key: "has_air_conditioner", label: "Máy lạnh" },
-  { key: "has_fridge", label: "Tủ lạnh" },
-  { key: "has_bed", label: "Giường" },
-  { key: "has_wardrobe", label: "Tủ đồ" },
-  { key: "allows_pet", label: "Cho nuôi thú cưng" },
-  { key: "is_furnished", label: "Nội thất" },
-  { key: "has_parking", label: "Chỗ để xe" },
-  { key: "has_security", label: "An ninh" }
-];
 
 export function LandlordShareView({ data }: { data: LandlordSharePageData }) {
   const shareText = buildLandlordShareText(data, getSiteUrl());
@@ -171,7 +157,8 @@ export function RoomShareView({ data }: { data: RoomSharePageData }) {
 
   const { building, landlord, room } = data;
   const images = displayImages(room.cover_image_url, room.images);
-  const features = activeFeatures(room.features);
+  const roomLayouts = getEffectiveRoomLayoutValues(room.room_layouts, room.features);
+  const amenities = getRoomAmenityLabels(room.features);
   const fees = feeRows(room.effective_fees);
   const shareText = buildRoomShareText({ building, room }, getSiteUrl());
 
@@ -276,10 +263,22 @@ export function RoomShareView({ data }: { data: RoomSharePageData }) {
         )}
       </Section>
 
-      <Section title="Tiện ích phòng">
-        {features.length > 0 ? (
+      <Section title="Dạng phòng">
+        {roomLayouts.length > 0 ? (
           <div className="flex flex-wrap gap-2">
-            {features.map((feature) => (
+            {roomLayouts.map((layout) => (
+              <Chip key={layout} label={layout} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">Chưa chọn dạng phòng.</p>
+        )}
+      </Section>
+
+      <Section title="Tiện ích phòng">
+        {amenities.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {amenities.map((feature) => (
               <Chip key={feature} label={feature} />
             ))}
           </div>
@@ -349,6 +348,7 @@ function BuildingSection({ building }: { building: ShareBuilding }) {
 
 function RoomSummaryCard({ room }: { room: ShareRoom }) {
   const images = displayImages(room.cover_image_url, room.images);
+  const roomLayouts = getEffectiveRoomLayoutValues(room.room_layouts, room.features).slice(0, 3);
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
@@ -379,6 +379,14 @@ function RoomSummaryCard({ room }: { room: ShareRoom }) {
             {room.available_from ? <Info label="Ngày vào" value={formatDate(room.available_from)} /> : null}
             {room.commission ? <Info label="Hoa hồng" value={room.commission} /> : null}
           </div>
+
+          {roomLayouts.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {roomLayouts.map((layout) => (
+                <Chip key={layout} label={layout} />
+              ))}
+            </div>
+          ) : null}
 
           <div className="mt-3 flex flex-wrap gap-2">
             <CopyLinkButton label="Copy link phòng" path={`/r/${room.public_slug}`} />
@@ -517,12 +525,6 @@ function displayImages(coverImageUrl: string | null, images: ShareImage[]) {
     seen.add(image);
     return true;
   });
-}
-
-function activeFeatures(features: RoomFeature | null) {
-  return featureLabels
-    .filter((feature) => features?.[feature.key])
-    .map((feature) => feature.label);
 }
 
 function formatLocation(building: Pick<ShareBuilding, "ward" | "district" | "city">) {

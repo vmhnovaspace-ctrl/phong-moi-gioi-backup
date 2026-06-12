@@ -4,13 +4,18 @@ import { BrokerCloseRequestButton } from "@/components/broker/broker-close-reque
 import { StatusBadge } from "@/components/landlord/status-badge";
 import type { BrokerInventoryRoom } from "@/lib/broker/types";
 import { formatCurrencyVnd } from "@/lib/landlord/format";
+import {
+  getEffectiveRoomLayoutValues,
+  getRoomAmenityLabels
+} from "@/lib/rooms/room-metadata";
 
 type BrokerRoomCardProps = {
   room: BrokerInventoryRoom;
 };
 
 export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
-  const roomType = getRoomTypeLabel(room);
+  const roomLayoutLabels = getEffectiveRoomLayoutValues(room.room_layouts, room.features);
+  const amenityLabels = getRoomAmenityLabels(room.features).slice(0, 5);
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-[#BFDBFE] hover:shadow-md">
@@ -32,20 +37,36 @@ export function BrokerRoomCard({ room }: BrokerRoomCardProps) {
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <InfoItem label="Giá thuê" value={formatCurrencyVnd(room.rent_price)} />
-          <InfoItem label="Tiền cọc" value={room.deposit_amount ? formatCurrencyVnd(room.deposit_amount) : "Chưa nhập"} />
+          <InfoItem
+            label="Tiền cọc"
+            value={room.deposit_amount ? formatCurrencyVnd(room.deposit_amount) : "Chưa nhập"}
+          />
           <InfoItem label="Tầng" value={room.floor || "Chưa nhập"} />
-          <InfoItem label="Dạng phòng" value={roomType} />
         </div>
 
-        {room.features ? (
-          <div className="flex flex-wrap gap-1.5">
-            {room.features.is_furnished ? <FeatureChip label="Nội thất" /> : null}
-            {room.features.allows_pet ? <FeatureChip label="Thú cưng" /> : null}
-            {room.features.has_balcony ? <FeatureChip label="Ban công" /> : null}
-            {room.features.has_parking ? <FeatureChip label="Chỗ xe" /> : null}
-            {room.features.has_window ? <FeatureChip label="Cửa sổ" /> : null}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dạng phòng</p>
+          {roomLayoutLabels.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {roomLayoutLabels.map((label) => (
+                <FeatureChip key={label} label={label} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm font-medium text-slate-500">Chưa nhập</p>
+          )}
+        </div>
+
+        {amenityLabels.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiện ích</p>
+            <div className="flex flex-wrap gap-1.5">
+              {amenityLabels.map((label) => (
+                <FeatureChip key={label} label={label} />
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -94,15 +115,4 @@ function InfoItem({ label, value }: { label: string; value: string }) {
       <p className="mt-1 truncate whitespace-nowrap text-sm font-bold text-slate-700">{value}</p>
     </div>
   );
-}
-
-function getRoomTypeLabel(room: BrokerInventoryRoom) {
-  const record = room as BrokerInventoryRoom & {
-    room_type?: string | null;
-    roomType?: string | null;
-    room_kind?: string | null;
-  };
-  const value = record.room_type ?? record.roomType ?? record.room_kind;
-
-  return value && value.trim().length > 0 ? value : "Chưa nhập";
 }

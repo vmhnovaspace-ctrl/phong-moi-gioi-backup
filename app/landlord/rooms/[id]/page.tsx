@@ -8,30 +8,16 @@ import { getSiteUrl } from "@/lib/env";
 import { feeRows, formatArea, formatCurrencyVnd, formatDate } from "@/lib/landlord/format";
 import { requireRole } from "@/lib/auth/profile";
 import { getLandlordRoom } from "@/lib/landlord/queries";
+import {
+  getEffectiveRoomLayoutValues,
+  getRoomAmenityLabels
+} from "@/lib/rooms/room-metadata";
 import { buildRoomShareText } from "@/lib/share/templates";
-import type { RoomFeature } from "@/lib/landlord/types";
 
 type PageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ created?: string; updated?: string }>;
 };
-
-const featureLabels: Array<{ key: keyof Omit<RoomFeature, "id" | "room_id">; label: string }> = [
-  { key: "has_window", label: "Cửa sổ" },
-  { key: "has_balcony", label: "Ban công" },
-  { key: "has_private_bathroom", label: "WC riêng" },
-  { key: "has_private_kitchen", label: "Bếp riêng" },
-  { key: "has_washing_machine", label: "Máy giặt" },
-  { key: "has_elevator", label: "Thang máy" },
-  { key: "has_air_conditioner", label: "Máy lạnh" },
-  { key: "has_fridge", label: "Tủ lạnh" },
-  { key: "has_bed", label: "Giường" },
-  { key: "has_wardrobe", label: "Tủ đồ" },
-  { key: "allows_pet", label: "Cho nuôi pet" },
-  { key: "is_furnished", label: "Full nội thất" },
-  { key: "has_parking", label: "Có chỗ để xe" },
-  { key: "has_security", label: "Bảo vệ" }
-];
 
 export default async function RoomDetailPage({ params, searchParams }: PageProps) {
   const [{ id }, query, profile] = await Promise.all([
@@ -45,7 +31,8 @@ export default async function RoomDetailPage({ params, searchParams }: PageProps
     notFound();
   }
 
-  const activeFeatures = featureLabels.filter((item) => room.features?.[item.key]);
+  const roomLayouts = getEffectiveRoomLayoutValues(room.room_layouts, room.features);
+  const activeFeatures = getRoomAmenityLabels(room.features);
   const fees = feeRows(room.effective_fees);
   const shareText = buildRoomShareText({ building: room.building, room }, getSiteUrl());
 
@@ -159,18 +146,43 @@ export default async function RoomDetailPage({ params, searchParams }: PageProps
       </section>
 
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Tiện ích</h2>
-        {activeFeatures.length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {activeFeatures.map((feature) => (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700" key={feature.key}>
-                {feature.label}
-              </span>
-            ))}
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">Dạng phòng</h2>
+            {roomLayouts.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {roomLayouts.map((layout) => (
+                  <span
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700"
+                    key={layout}
+                  >
+                    {layout}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">Chưa chọn dạng phòng.</p>
+            )}
           </div>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">Chưa chọn tiện ích.</p>
-        )}
+
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">Tiện ích</h2>
+            {activeFeatures.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {activeFeatures.map((feature) => (
+                  <span
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700"
+                    key={feature}
+                  >
+                    {feature}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">Chưa chọn tiện ích.</p>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );

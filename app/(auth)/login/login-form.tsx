@@ -8,13 +8,16 @@ import { SubmitButton } from "@/components/auth/submit-button";
 
 type LoginFormProps = {
   message?: string;
+  nextPath?: string;
 };
 
-export function LoginForm({ message }: LoginFormProps) {
+export function LoginForm({ message, nextPath }: LoginFormProps) {
   const [state, formAction] = useActionState(loginAction, {});
 
   return (
     <form action={formAction} className="space-y-4">
+      {nextPath ? <input name="next" type="hidden" value={nextPath} /> : null}
+
       {message === "password-reset-success" ? (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
           Đổi mật khẩu thành công, vui lòng đăng nhập lại.

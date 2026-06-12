@@ -33,6 +33,7 @@ import {
   mapRoomFeaturesToVietnamese
 } from "@/lib/broker/post-templates";
 import { formatArea, formatCurrencyVnd } from "@/lib/landlord/format";
+import { buildAbsoluteUrl } from "@/lib/site-url";
 import { getHcmcDistricts, getHcmcWards } from "@/lib/vietnam-hcmc-locations";
 import { CURRENT_ADMIN_UNIT_OPTIONS } from "@/src/lib/location-options";
 import { matchesLocationFilter } from "@/src/lib/location-utils";
@@ -1183,9 +1184,7 @@ function buildZaloUrl(customerPhone: string | null, customerZaloLink: string | n
 }
 
 function getClientPackageUrl(publicSlug: string) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || window.location.origin;
-
-  return `${siteUrl.replace(/\/$/, "")}/p/${publicSlug}`;
+  return buildAbsoluteUrl(`/p/${publicSlug}`);
 }
 
 function normalizePackageResult(result: CreatedPackageResult): CreatedPackageResult {

@@ -172,9 +172,11 @@ export async function createRoomCloseRequest(
     }
 
     revalidateBrokerRoomPaths(roomId);
+    revalidatePath("/landlord");
     revalidatePath("/landlord/sell-list");
     revalidatePath(`/landlord/buildings/${building.id}`);
     revalidatePath(`/landlord/buildings/${building.id}/sell-list`);
+    revalidatePath(`/landlord/rooms/${roomId}`);
 
     return { message: "Đã báo chủ nhà, đang chờ xác nhận." };
   } catch (error) {

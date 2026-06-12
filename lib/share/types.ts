@@ -39,6 +39,7 @@ export type ShareRoom = {
   commission: string | null;
   min_lease_months: number | null;
   fee_mode: FeeMode;
+  room_layouts: string[] | null;
   description: string | null;
   strengths: string | null;
   weaknesses: string | null;

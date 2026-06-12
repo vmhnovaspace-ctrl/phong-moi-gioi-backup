@@ -24,6 +24,7 @@ export type BrokerLandlordContact = {
   id: string;
   full_name: string;
   phone: string | null;
+  public_slug: string | null;
 };
 
 export type BrokerRoomBuilding = Pick<
@@ -61,6 +62,7 @@ export type BrokerRoomListItem = Pick<
   | "description"
   | "strengths"
   | "weaknesses"
+  | "room_layouts"
   | "updated_at"
 > & {
   building: BrokerRoomBuilding;
@@ -102,6 +104,7 @@ export type BrokerInventoryRoom = BrokerRoomListItem & {
 export type BrokerInventoryFilters = {
   q?: string;
   landlord?: string;
+  landlordId?: string;
   boundaryMode?: BoundaryMode;
   district?: string;
   ward?: string;
@@ -300,6 +303,7 @@ export type PublicPackageRoom = {
   building_drive_folder_url: string | null;
   cover_image_url: string | null;
   location: string;
+  room_layouts: string[] | null;
   features: PublicPackageFeatureSet | null;
   images: PublicPackageImage[];
 };

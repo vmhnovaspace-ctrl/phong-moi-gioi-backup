@@ -21,12 +21,25 @@ function getRedirectPath(role: UserRole, status: "pending" | "active" | "blocked
   });
 }
 
+function getSafeNextPath(value: string) {
+  if (!value.startsWith("/") || value.startsWith("//")) {
+    return "";
+  }
+
+  if (value.startsWith("/login") || value.startsWith("/register")) {
+    return "";
+  }
+
+  return value;
+}
+
 export async function loginAction(
   _previousState: AuthState,
   formData: FormData
 ): Promise<AuthState> {
   const phoneInput = getString(formData, "phone");
   const password = getString(formData, "password");
+  const nextPath = getSafeNextPath(getString(formData, "next"));
   let phone: string;
 
   try {
@@ -59,7 +72,7 @@ export async function loginAction(
     };
   }
 
-  redirect(getRedirectPath(profile.role, profile.status));
+  redirect(profile.status === "active" && nextPath ? nextPath : getRedirectPath(profile.role, profile.status));
 }
 
 export async function registerAction(
@@ -70,6 +83,7 @@ export async function registerAction(
   const phoneInput = getString(formData, "phone");
   const password = getString(formData, "password");
   const confirmPassword = getString(formData, "confirm_password");
+  const nextPath = getSafeNextPath(getString(formData, "next"));
   const roleInput = getString(formData, "role").toLowerCase();
   const role = isAssignablePublicRole(roleInput) ? roleInput : "broker";
   let phone: string;
@@ -122,9 +136,10 @@ export async function registerAction(
   const profile =
     (await getProfile(data.user.id)) ?? (await syncProfileFromUser(data.user));
 
-  redirect(
-    getRedirectPath(profile?.role ?? role, profile?.status ?? "pending")
-  );
+  const redirectRole = profile?.role ?? role;
+  const redirectStatus = profile?.status ?? "pending";
+
+  redirect(redirectStatus === "active" && nextPath ? nextPath : getRedirectPath(redirectRole, redirectStatus));
 }
 
 export async function forgotPasswordAction(

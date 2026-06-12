@@ -1,15 +1,20 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { Building2, CheckCircle2, Clock3, DoorOpen, Plus, Send } from "lucide-react";
+import { Building2, CheckCircle2, Clock3, DoorOpen, Plus } from "lucide-react";
 import { BuildingCard } from "@/components/landlord/building-card";
 import { EmptyState } from "@/components/landlord/empty-state";
+import { LandlordCloseToast } from "@/components/landlord/landlord-close-toast";
 import { LandlordZaloGroupForm } from "@/components/landlord/landlord-zalo-group-form";
-import { CopyLinkButton } from "@/components/share/copy-link-button";
 import { requireRole } from "@/lib/auth/profile";
-import { getLandlordBuildingSummaries } from "@/lib/landlord/queries";
+import { getLandlordBuildingSummaries, getLandlordCloseToastItems } from "@/lib/landlord/queries";
 
 export default async function LandlordPage() {
   const profile = await requireRole(["landlord"]);
-  const buildings = await getLandlordBuildingSummaries(profile.id);
+  const [buildings, closeToasts] = await Promise.all([
+    getLandlordBuildingSummaries(profile.id),
+    getLandlordCloseToastItems(profile.id)
+  ]);
+
   const totals = buildings.reduce(
     (acc, building) => {
       acc.totalRooms += building.total_rooms;
@@ -26,6 +31,8 @@ export default async function LandlordPage() {
 
   return (
     <div className="space-y-5">
+      <LandlordCloseToast items={closeToasts} />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-black text-slate-950">Bảng điều khiển chủ nhà</h2>
@@ -33,30 +40,31 @@ export default async function LandlordPage() {
             Theo dõi nhanh số căn, số phòng và các phòng đang có thể sell.
           </p>
         </div>
-        <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
-          <CopyLinkButton label="Copy link kho" path={`/l/${profile.public_slug}`} />
-          <Link
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#0F5FD7] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#0B4FB5]"
-            href="/landlord/buildings/new"
-          >
-            <Plus className="size-4" aria-hidden />
-            Thêm căn nhà
-          </Link>
-          <Link
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-5 text-sm font-bold text-[#0B3B82] hover:bg-[#EFF6FF]"
-            href="/landlord/sell-list"
-          >
-            <Send className="size-4" aria-hidden />
-            Phòng đang sell
-          </Link>
-        </div>
+
+        <Link
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#0F5FD7] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#0B4FB5]"
+          href="/landlord/buildings/new"
+        >
+          <Plus className="size-4" aria-hidden />
+          Thêm căn nhà
+        </Link>
       </div>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric icon={<Building2 className="size-4" aria-hidden />} label="Tổng căn" value={buildings.length} />
         <Metric icon={<DoorOpen className="size-4" aria-hidden />} label="Tổng phòng" value={totals.totalRooms} />
-        <Metric icon={<CheckCircle2 className="size-4" aria-hidden />} label="Đang trống" tone="green" value={totals.availableRooms} />
-        <Metric icon={<Clock3 className="size-4" aria-hidden />} label="Sắp trống" tone="blue" value={totals.comingSoonRooms} />
+        <Metric
+          icon={<CheckCircle2 className="size-4" aria-hidden />}
+          label="Đang trống"
+          tone="green"
+          value={totals.availableRooms}
+        />
+        <Metric
+          icon={<Clock3 className="size-4" aria-hidden />}
+          label="Sắp trống"
+          tone="blue"
+          value={totals.comingSoonRooms}
+        />
       </section>
 
       {buildings.length > 0 ? (
@@ -88,7 +96,7 @@ function Metric({
   tone = "slate",
   value
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   tone?: "blue" | "green" | "slate";
   value: number;

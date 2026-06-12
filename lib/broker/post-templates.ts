@@ -1,5 +1,9 @@
 import type { BrokerPostChannel } from "@/lib/broker/types";
 import type { FeeFields, ImageSourceType, RoomFeature, RoomStatus } from "@/lib/landlord/types";
+import {
+  getEffectiveRoomLayoutValues,
+  getRoomAmenityLabels
+} from "@/lib/rooms/room-metadata";
 
 export type RoomPostFeatureInput = Partial<Omit<RoomFeature, "id" | "room_id">> | null;
 
@@ -29,6 +33,7 @@ export type RoomPostRoomInput = {
   room_drive_folder_url: string | null;
   cover_image_url: string | null;
   public_slug?: string | null;
+  room_layouts?: string[] | null;
 };
 
 export type RoomPostBuildingInput = {
@@ -65,21 +70,15 @@ export const postChannelLabels: Record<BrokerPostChannel, string> = {
   zalo: "Zalo"
 };
 
-const featureLabels: Array<{ key: keyof Omit<RoomFeature, "id" | "room_id">; label: string; highlight?: string }> = [
-  { key: "is_furnished", label: "Full nội thất", highlight: "full nội thất" },
-  { key: "has_balcony", label: "Ban công", highlight: "có ban công" },
-  { key: "has_window", label: "Cửa sổ", highlight: "có cửa sổ" },
-  { key: "has_elevator", label: "Thang máy", highlight: "có thang máy" },
-  { key: "has_private_bathroom", label: "WC riêng" },
-  { key: "has_private_kitchen", label: "Bếp riêng" },
-  { key: "has_washing_machine", label: "Máy giặt" },
-  { key: "has_air_conditioner", label: "Máy lạnh" },
-  { key: "has_fridge", label: "Tủ lạnh" },
-  { key: "has_bed", label: "Giường" },
-  { key: "has_wardrobe", label: "Tủ quần áo" },
-  { key: "allows_pet", label: "Cho nuôi thú cưng" },
-  { key: "has_parking", label: "Chỗ để xe" },
-  { key: "has_security", label: "An ninh/camera", highlight: "an ninh/camera" }
+const highlightFeatureLabels: Array<{
+  key: keyof Omit<RoomFeature, "id" | "room_id">;
+  highlight: string;
+}> = [
+  { key: "is_furnished", highlight: "full nội thất" },
+  { key: "has_elevator", highlight: "có thang máy" },
+  { key: "has_security", highlight: "an ninh/camera" },
+  { key: "allows_pet", highlight: "cho nuôi pet" },
+  { key: "has_parking", highlight: "có chỗ để xe" }
 ];
 
 export function generateRoomPost({
@@ -93,15 +92,17 @@ export function generateRoomPost({
   const district = building.district || building.ward || "";
   const area = formatAreaForPost(room.area_m2);
   const price = formatCurrencyVND(room.rent_price);
+  const roomLayouts = getEffectiveRoomLayoutValues(room.room_layouts, features);
   const amenities = mapRoomFeaturesToVietnamese(features);
   const highlights = getHighlights(room, building, features);
   const feeLines = getFeeLines(fees);
   const title = buildSeoTitle({ area, building, highlights, price, tenantLocation });
-  const cta = channel === "zalo"
-    ? "Anh/chị xem qua phòng này nhé. Nếu phù hợp em gửi thêm hình ảnh/video và hẹn lịch xem phòng."
-    : channel === "facebook"
-      ? "Inbox/Zalo để xem phòng thực tế và nhận thêm danh sách phòng phù hợp."
-      : "Liên hệ để xem phòng thực tế và nhận thêm hình ảnh/video chi tiết.";
+  const cta =
+    channel === "zalo"
+      ? "Anh/chị xem qua phòng này nhé. Nếu phù hợp em gửi thêm hình ảnh/video và hẹn lịch xem phòng."
+      : channel === "facebook"
+        ? "Inbox/Zalo để xem phòng thực tế và nhận thêm danh sách phòng phù hợp."
+        : "Liên hệ để xem phòng thực tế và nhận thêm hình ảnh/video chi tiết.";
 
   if (channel === "zalo") {
     return {
@@ -112,6 +113,7 @@ export function generateRoomPost({
         area ? `Diện tích: ${area}` : null,
         room.deposit_amount ? `Cọc: ${formatCurrencyVND(room.deposit_amount)}` : null,
         room.max_people ? `Phù hợp: ${room.max_people} người` : null,
+        roomLayouts.length > 0 ? `Dạng phòng: ${roomLayouts.slice(0, 4).join(", ")}` : null,
         highlights.length > 0 ? `Điểm nổi bật: ${highlights.slice(0, 3).join(", ")}` : null,
         amenities.length > 0 ? `Tiện ích: ${amenities.slice(0, 6).join(", ")}` : null,
         feeLines.length > 0 ? ["Chi phí:", ...feeLines.slice(0, 4).map((line) => `- ${line}`)].join("\n") : null,
@@ -134,6 +136,7 @@ export function generateRoomPost({
         room.deposit_amount ? `Cọc: ${formatCurrencyVND(room.deposit_amount)}` : null,
         room.max_people ? `Số người phù hợp: ${room.max_people} người` : null
       ]),
+      roomLayouts.length > 0 ? section("Dạng phòng", roomLayouts) : null,
       highlights.length > 0 ? section("Điểm nổi bật", highlights) : null,
       amenities.length > 0 ? section("Tiện ích", amenities) : null,
       feeLines.length > 0 ? section("Chi phí", feeLines) : null,
@@ -159,13 +162,7 @@ export function buildTenantSafeLocation(building: RoomPostBuildingInput) {
 }
 
 export function mapRoomFeaturesToVietnamese(features: RoomPostFeatureInput | undefined) {
-  if (!features) {
-    return [];
-  }
-
-  return featureLabels
-    .filter((feature) => Boolean(features[feature.key]))
-    .map((feature) => feature.label);
+  return getRoomAmenityLabels(features);
 }
 
 export function formatCurrencyVND(value: number | null | undefined) {
@@ -224,15 +221,16 @@ function getHighlights(
   building: RoomPostBuildingInput,
   features: RoomPostFeatureInput | undefined
 ) {
-  const featureHighlights = featureLabels
-    .filter((feature) => Boolean(features?.[feature.key]) && feature.highlight)
-    .map((feature) => sentenceCase(feature.highlight as string));
+  const roomLayouts = getEffectiveRoomLayoutValues(room.room_layouts, features);
+  const featureHighlights = highlightFeatureLabels
+    .filter((feature) => Boolean(features?.[feature.key]))
+    .map((feature) => sentenceCase(feature.highlight));
   const textHighlights = [room.strengths, room.description, building.common_amenities]
     .flatMap((value) => splitTextHighlights(value, room))
     .slice(0, 4);
   const locationHighlight = building.district ? `Khu vực ${building.district} thuận tiện di chuyển` : null;
 
-  return uniqueStrings([...featureHighlights, ...textHighlights, locationHighlight]).slice(0, 7);
+  return uniqueStrings([...roomLayouts.slice(0, 2), ...featureHighlights, ...textHighlights, locationHighlight]).slice(0, 7);
 }
 
 function getFeeLines(fees: Partial<FeeFields> | null | undefined) {

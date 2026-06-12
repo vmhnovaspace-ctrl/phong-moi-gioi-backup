@@ -9,32 +9,19 @@ import type {
   Building,
   BuildingFee,
   LandlordFormState,
-  RoomFeature,
   RoomWithBuilding
 } from "@/lib/landlord/types";
+import {
+  getEffectiveRoomLayoutKeys,
+  ROOM_AMENITY_OPTIONS,
+  ROOM_LAYOUT_OPTIONS
+} from "@/lib/rooms/room-metadata";
 
 type RoomFormProps = {
   building?: Pick<Building, "id" | "name">;
   buildingFees?: BuildingFee | null;
   room?: RoomWithBuilding;
 };
-
-const featureFields: Array<{ name: keyof Omit<RoomFeature, "id" | "room_id">; label: string }> = [
-  { name: "has_window", label: "Cửa sổ" },
-  { name: "has_balcony", label: "Ban công" },
-  { name: "has_private_bathroom", label: "WC riêng" },
-  { name: "has_private_kitchen", label: "Bếp riêng" },
-  { name: "has_washing_machine", label: "Máy giặt" },
-  { name: "has_elevator", label: "Thang máy" },
-  { name: "has_air_conditioner", label: "Máy lạnh" },
-  { name: "has_fridge", label: "Tủ lạnh" },
-  { name: "has_bed", label: "Giường" },
-  { name: "has_wardrobe", label: "Tủ đồ" },
-  { name: "allows_pet", label: "Cho nuôi pet" },
-  { name: "is_furnished", label: "Full nội thất" },
-  { name: "has_parking", label: "Có chỗ để xe" },
-  { name: "has_security", label: "Bảo vệ" }
-];
 
 export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
   const action = room
@@ -44,6 +31,7 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
   const fees = room?.fees ?? null;
   const activeBuildingFees = room?.building_fees ?? buildingFees ?? null;
   const features = room?.features;
+  const roomLayoutKeys = getEffectiveRoomLayoutKeys(room?.room_layouts, features);
 
   return (
     <form action={formAction} className="space-y-4" encType="multipart/form-data">
@@ -65,7 +53,12 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
           <NumberField defaultValue={room?.rent_price ?? ""} label="Giá thuê" name="rent_price" required />
           <NumberField defaultValue={room?.deposit_amount ?? ""} label="Tiền cọc" name="deposit_amount" />
           <NumberField defaultValue={room?.max_people ?? ""} label="Số người tối đa" name="max_people" />
-          <NumberField defaultValue={room?.min_lease_months ?? ""} label="Thời hạn thuê tối thiểu" name="min_lease_months" suffix="tháng" />
+          <NumberField
+            defaultValue={room?.min_lease_months ?? ""}
+            label="Thời hạn thuê tối thiểu"
+            name="min_lease_months"
+            suffix="tháng"
+          />
           <label className="block">
             <span className="text-sm font-medium text-slate-800">Trạng thái</span>
             <select
@@ -132,18 +125,40 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-black text-slate-950">Tiện ích</h2>
+        <h2 className="text-base font-black text-slate-950">Dạng phòng</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {featureFields.map((field) => (
+          {ROOM_LAYOUT_OPTIONS.map((layout) => (
             <label
               className="flex min-h-12 items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-800"
-              key={field.name}
+              key={layout.key}
             >
               <input
                 className="size-5 rounded border-slate-300 text-[#0F5FD7] focus:ring-[#93C5FD]"
-                defaultChecked={features?.[field.name] ?? false}
-                name={field.name}
+                defaultChecked={roomLayoutKeys.includes(layout.key)}
+                name="room_layouts"
                 type="checkbox"
+                value={layout.key}
+              />
+              {layout.label}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-black text-slate-950">Tiện ích</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {ROOM_AMENITY_OPTIONS.map((field) => (
+            <label
+              className="flex min-h-12 items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-800"
+              key={field.key}
+            >
+              <input
+                className="size-5 rounded border-slate-300 text-[#0F5FD7] focus:ring-[#93C5FD]"
+                defaultChecked={features?.[field.featureKey] ?? false}
+                name={field.featureKey}
+                type="checkbox"
+                value={field.key}
               />
               {field.label}
             </label>
@@ -189,7 +204,6 @@ export function RoomForm({ building, buildingFees, room }: RoomFormProps) {
         <div className="mt-4 grid gap-4">
           <TextArea defaultValue={room?.description ?? ""} label="Mô tả" name="description" />
           <TextArea defaultValue={room?.strengths ?? ""} label="Điểm mạnh" name="strengths" />
-          <TextArea defaultValue={room?.weaknesses ?? ""} label="Điểm yếu" name="weaknesses" />
         </div>
       </section>
 

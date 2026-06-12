@@ -2,9 +2,13 @@ import { notFound } from "next/navigation";
 import { ExternalLink, ImageIcon, ShieldCheck, Users } from "lucide-react";
 import { InterestCopyButton } from "@/components/public/interest-copy-button";
 import { getPublicCustomerRoomPackage } from "@/lib/broker/queries";
-import { sanitizeAddressForTenant, mapRoomFeaturesToVietnamese } from "@/lib/broker/post-templates";
+import { sanitizeAddressForTenant } from "@/lib/broker/post-templates";
 import type { PublicPackageRoom } from "@/lib/broker/types";
 import { formatArea, formatCurrencyVnd } from "@/lib/landlord/format";
+import {
+  getEffectiveRoomLayoutValues,
+  getRoomAmenityLabels
+} from "@/lib/rooms/room-metadata";
 
 type PublicPackagePageProps = {
   params: Promise<{ packageSlug: string }>;
@@ -32,7 +36,7 @@ export default async function PublicPackagePage({ params }: PublicPackagePagePro
               : "Danh sách phòng phù hợp cho bạn"}
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-            Môi giới đã chọn sẵn một số phòng theo nhu cầu của bạn. Xem ảnh, giá và tiện ích trước khi hẹn lịch đi xem thực tế.
+            Môi giới đã chọn sẵn một số phòng theo nhu cầu của bạn. Xem ảnh, giá, dạng phòng và tiện ích trước khi hẹn lịch đi xem thực tế.
           </p>
           {data.customer_need ? (
             <div className="mt-5 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
@@ -75,7 +79,8 @@ function PublicRoomCard({
   const images = getDisplayImages(room);
   const primaryImage = images[0];
   const driveUrl = room.room_drive_folder_url || room.building_drive_folder_url;
-  const features = mapRoomFeaturesToVietnamese(room.features).slice(0, 5);
+  const roomLayouts = getEffectiveRoomLayoutValues(room.room_layouts, room.features).slice(0, 4);
+  const amenities = getRoomAmenityLabels(room.features).slice(0, 5);
   const safeLocation = sanitizeAddressForTenant(room.location);
   const interestText = [
     `Em quan tâm phòng số ${index} trong danh sách.`,
@@ -132,16 +137,35 @@ function PublicRoomCard({
             {room.max_people ? <InfoBox label="Phù hợp" value={`${room.max_people} người`} /> : null}
           </div>
 
-          {features.length > 0 ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {features.map((feature) => (
-                <span
-                  className="rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1 text-xs font-bold text-[#0B3B82]"
-                  key={feature}
-                >
-                  {feature}
-                </span>
-              ))}
+          {roomLayouts.length > 0 ? (
+            <div className="mt-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Dạng phòng</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {roomLayouts.map((layout) => (
+                  <span
+                    className="rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1 text-xs font-bold text-[#0B3B82]"
+                    key={layout}
+                  >
+                    {layout}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {amenities.length > 0 ? (
+            <div className="mt-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Tiện ích</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {amenities.map((feature) => (
+                  <span
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700"
+                    key={feature}
+                  >
+                    {feature}
+                  </span>
+                ))}
+              </div>
             </div>
           ) : null}
 

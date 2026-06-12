@@ -5,11 +5,17 @@ import { registerAction } from "@/app/(auth)/actions";
 import { FormField } from "@/components/auth/form-field";
 import { SubmitButton } from "@/components/auth/submit-button";
 
-export function RegisterForm() {
+type RegisterFormProps = {
+  nextPath?: string;
+};
+
+export function RegisterForm({ nextPath }: RegisterFormProps) {
   const [state, formAction] = useActionState(registerAction, {});
 
   return (
     <form action={formAction} className="space-y-4">
+      {nextPath ? <input name="next" type="hidden" value={nextPath} /> : null}
+
       {state.error ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {state.error}

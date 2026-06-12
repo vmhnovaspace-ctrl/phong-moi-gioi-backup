@@ -88,11 +88,11 @@ export async function getCurrentProfile() {
   return profile;
 }
 
-export async function requireAuthProfile() {
+export async function requireAuthProfile(nextPath?: string) {
   const profile = await getCurrentProfile();
 
   if (!profile) {
-    redirect("/login");
+    redirect(nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : "/login");
   }
 
   if (profile.status === "pending") {
@@ -106,8 +106,8 @@ export async function requireAuthProfile() {
   return profile;
 }
 
-export async function requireRole(allowedRoles: UserRole[]) {
-  const profile = await requireAuthProfile();
+export async function requireRole(allowedRoles: UserRole[], nextPath?: string) {
+  const profile = await requireAuthProfile(nextPath);
 
   if (!allowedRoles.includes(profile.role)) {
     redirect(getHomePathForProfile(profile));

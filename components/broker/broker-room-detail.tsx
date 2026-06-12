@@ -18,34 +18,21 @@ import { StatusBadge } from "@/components/landlord/status-badge";
 import { CopyLinkButton } from "@/components/share/copy-link-button";
 import type { BrokerRoomDetail as BrokerRoomDetailData } from "@/lib/broker/types";
 import { getSiteUrl } from "@/lib/env";
-import { buildGoogleMapsUrl } from "@/lib/maps";
 import { feeRows, formatArea, formatCurrencyVnd, formatDate, roomStatusLabels } from "@/lib/landlord/format";
-import type { RoomFeature } from "@/lib/landlord/types";
+import { buildGoogleMapsUrl } from "@/lib/maps";
+import {
+  getEffectiveRoomLayoutValues,
+  getRoomAmenityLabels
+} from "@/lib/rooms/room-metadata";
 import { buildRoomShareText } from "@/lib/share/templates";
 
 type BrokerRoomDetailProps = {
   room: BrokerRoomDetailData;
 };
 
-const featureLabels: Array<{ key: keyof Omit<RoomFeature, "id" | "room_id">; label: string }> = [
-  { key: "has_window", label: "Cửa sổ" },
-  { key: "has_balcony", label: "Ban công" },
-  { key: "has_private_bathroom", label: "WC riêng" },
-  { key: "has_private_kitchen", label: "Bếp riêng" },
-  { key: "has_washing_machine", label: "Máy giặt" },
-  { key: "has_elevator", label: "Thang máy" },
-  { key: "has_air_conditioner", label: "Máy lạnh" },
-  { key: "has_fridge", label: "Tủ lạnh" },
-  { key: "has_bed", label: "Giường" },
-  { key: "has_wardrobe", label: "Tủ đồ" },
-  { key: "allows_pet", label: "Cho nuôi thú cưng" },
-  { key: "is_furnished", label: "Nội thất" },
-  { key: "has_parking", label: "Chỗ để xe" },
-  { key: "has_security", label: "An ninh" }
-];
-
 export function BrokerRoomDetail({ room }: BrokerRoomDetailProps) {
-  const activeFeatures = featureLabels.filter((item) => room.features?.[item.key]);
+  const roomLayouts = getEffectiveRoomLayoutValues(room.room_layouts, room.features);
+  const activeFeatures = getRoomAmenityLabels(room.features);
   const fees = feeRows(room.effective_fees);
   const copyText = buildRoomShareText({ building: room.building, room }, getSiteUrl());
   const primaryImage = room.cover_image_url || room.images[0]?.image_url;
@@ -119,10 +106,24 @@ export function BrokerRoomDetail({ room }: BrokerRoomDetailProps) {
             <div className="grid grid-cols-2 gap-2">
               <Detail label="Mã phòng" value={room.room_code} />
               <Detail label="Trạng thái" value={roomStatusLabels[room.status]} />
-              {room.area_m2 ? <Detail icon={<Ruler className="size-4" aria-hidden />} label="Diện tích" value={formatArea(room.area_m2)} /> : null}
+              {room.area_m2 ? (
+                <Detail icon={<Ruler className="size-4" aria-hidden />} label="Diện tích" value={formatArea(room.area_m2)} />
+              ) : null}
               {room.floor ? <Detail label="Tầng" value={room.floor} /> : null}
-              {room.max_people ? <Detail icon={<Users className="size-4" aria-hidden />} label="Số người tối đa" value={`${room.max_people} người`} /> : null}
-              {room.available_from ? <Detail icon={<CalendarDays className="size-4" aria-hidden />} label="Ngày có thể vào" value={formatDate(room.available_from)} /> : null}
+              {room.max_people ? (
+                <Detail
+                  icon={<Users className="size-4" aria-hidden />}
+                  label="Số người tối đa"
+                  value={`${room.max_people} người`}
+                />
+              ) : null}
+              {room.available_from ? (
+                <Detail
+                  icon={<CalendarDays className="size-4" aria-hidden />}
+                  label="Ngày có thể vào"
+                  value={formatDate(room.available_from)}
+                />
+              ) : null}
               {room.min_lease_months ? <Detail label="Thuê tối thiểu" value={`${room.min_lease_months} tháng`} /> : null}
             </div>
 
@@ -155,15 +156,32 @@ export function BrokerRoomDetail({ room }: BrokerRoomDetailProps) {
             )}
           </Section>
 
+          <Section title="Dạng phòng">
+            {roomLayouts.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {roomLayouts.map((layout) => (
+                  <span
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700"
+                    key={layout}
+                  >
+                    {layout}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">Chưa chọn dạng phòng.</p>
+            )}
+          </Section>
+
           <Section title="Tiện ích phòng">
             {activeFeatures.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {activeFeatures.map((feature) => (
                   <span
                     className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700"
-                    key={feature.key}
+                    key={feature}
                   >
-                    {feature.label}
+                    {feature}
                   </span>
                 ))}
               </div>
@@ -240,10 +258,7 @@ export function BrokerRoomDetail({ room }: BrokerRoomDetailProps) {
               <CopyLinkButton label="Copy link phòng" path={`/r/${room.public_slug}`} />
             </div>
           </Section>
-          <BrokerRoomActionsPanel
-            action={room.action}
-            roomId={room.id}
-          />
+          <BrokerRoomActionsPanel action={room.action} roomId={room.id} />
           <BrokerRoomReportPanel roomId={room.id} />
 
           <Section title="Thông tin chủ nhà">
@@ -270,32 +285,6 @@ export function BrokerRoomDetail({ room }: BrokerRoomDetailProps) {
       </div>
     </div>
   );
-}
-
-function buildCopyText(
-  room: BrokerRoomDetailData,
-  features: string[],
-  fees: Array<{ label: string; value: string }>
-) {
-  const area = [room.building.ward, room.building.district].filter(Boolean).join(" - ");
-
-  return [
-    `CHO THUÊ PHÒNG${area ? ` ${area.toUpperCase()}` : ""}`,
-    "",
-    `Phòng: ${room.room_code}`,
-    room.title ? `Tiêu đề: ${room.title}` : null,
-    `Giá: ${formatCurrencyVnd(room.rent_price)}/tháng`,
-    room.area_m2 ? `Diện tích: ${formatArea(room.area_m2)}` : null,
-    `Trạng thái: ${roomStatusLabels[room.status]}`,
-    `Địa chỉ: ${[room.building.address, room.building.ward, room.building.district].filter(Boolean).join(", ")}`,
-    room.commission ? `Hoa hồng: ${room.commission}` : null,
-    features.length > 0 ? ["", "Tiện ích:", ...features.map((feature) => `- ${feature}`)].join("\n") : null,
-    fees.length > 0 ? ["", "Chi phí:", ...fees.map((fee) => `- ${fee.label}: ${fee.value}`)].join("\n") : null,
-    room.room_drive_folder_url ? ["", "Xem ảnh:", room.room_drive_folder_url].join("\n") : null,
-    ["", "Xem chi tiết:", `/broker/rooms/${room.id}`].join("\n")
-  ]
-    .filter(Boolean)
-    .join("\n");
 }
 
 function Section({ children, title }: { children: React.ReactNode; title: string }) {

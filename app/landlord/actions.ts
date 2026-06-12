@@ -7,11 +7,16 @@ import { isRoomStatus } from "@/lib/landlord/queries";
 import type {
   FeeMode,
   LandlordFormState,
+  Room,
   RoomFeature,
   RoomImage,
   RoomSellEventType,
   RoomStatus
 } from "@/lib/landlord/types";
+import {
+  getLegacyRoomLayoutFeatureFlags,
+  parseRoomLayoutsFromFormData
+} from "@/lib/rooms/room-metadata";
 import { createClient } from "@/lib/supabase/server";
 
 function getString(formData: FormData, key: string) {
@@ -101,7 +106,7 @@ function parseOptionalCoordinate(formData: FormData, key: string, message: strin
 }
 
 function checkbox(formData: FormData, key: string) {
-  return formData.get(key) === "on";
+  return formData.getAll(key).some((value) => value !== "false" && value !== "0" && value !== "");
 }
 
 function isFeeMode(value: string): value is FeeMode {
@@ -144,7 +149,13 @@ async function requireOwnedRoom(roomId: string, landlordId: string) {
     .select("*, buildings!inner(id, landlord_id)")
     .eq("id", roomId)
     .eq("buildings.landlord_id", landlordId)
-    .maybeSingle<Record<string, unknown> & { id: string; building_id: string }>();
+    .maybeSingle<
+      Room & {
+        buildings:
+          | { id: string; landlord_id: string }
+          | Array<{ id: string; landlord_id: string }>;
+      }
+    >();
 
   if (error) {
     throw new Error(error.message);
@@ -159,7 +170,15 @@ async function requireOwnedRoom(roomId: string, landlordId: string) {
 
 function getBuildingPayload(formData: FormData) {
   const name = getString(formData, "name");
-  const address = getString(formData, "address");
+  const oldAddress = getString(formData, "old_address");
+  const oldWard = nullableString(formData, "old_ward");
+  const oldDistrict = nullableString(formData, "old_district");
+  const newAddress = getString(formData, "new_address");
+  const newWard = nullableString(formData, "new_ward");
+  const newDistrict = nullableString(formData, "new_district");
+  const address = newAddress || oldAddress;
+  const ward = newWard ?? oldWard;
+  const district = newDistrict ?? oldDistrict;
   const city = getString(formData, "city") || "TP.HCM";
 
   if (!name || !address) {
@@ -172,7 +191,7 @@ function getBuildingPayload(formData: FormData) {
     city,
     common_amenities: nullableString(formData, "common_amenities"),
     description: nullableString(formData, "description"),
-    district: nullableString(formData, "district"),
+    district,
     formatted_address: nullableString(formData, "formatted_address"),
     google_place_id: nullableString(formData, "google_place_id"),
     google_maps_url: nullableString(formData, "google_maps_url"),
@@ -180,7 +199,13 @@ function getBuildingPayload(formData: FormData) {
     latitude: parseOptionalCoordinate(formData, "latitude", "Vui lòng nhập vĩ độ hợp lệ."),
     longitude: parseOptionalCoordinate(formData, "longitude", "Vui lòng nhập kinh độ hợp lệ."),
     name,
-    ward: nullableString(formData, "ward"),
+    new_address: newAddress || null,
+    new_district: newDistrict,
+    new_ward: newWard,
+    old_address: oldAddress || null,
+    old_district: oldDistrict,
+    old_ward: oldWard,
+    ward,
     zalo_group_name: nullableString(formData, "zalo_group_name"),
     zalo_group_url: nullableString(formData, "zalo_group_url")
   };
@@ -192,6 +217,12 @@ function withoutMapFields<T extends Record<string, unknown>>(payload: T) {
     google_place_id: _googlePlaceId,
     latitude: _latitude,
     longitude: _longitude,
+    new_address: _newAddress,
+    new_district: _newDistrict,
+    new_ward: _newWard,
+    old_address: _oldAddress,
+    old_district: _oldDistrict,
+    old_ward: _oldWard,
     zalo_group_name: _zaloGroupName,
     zalo_group_url: _zaloGroupUrl,
     ...rest
@@ -207,6 +238,12 @@ function isMissingMapColumnError(error: { message?: string; code?: string }) {
     error.code === "PGRST204" ||
     message.includes("latitude") ||
     message.includes("longitude") ||
+    message.includes("old_address") ||
+    message.includes("old_ward") ||
+    message.includes("old_district") ||
+    message.includes("new_address") ||
+    message.includes("new_ward") ||
+    message.includes("new_district") ||
     message.includes("formatted_address") ||
     message.includes("google_place_id") ||
     message.includes("zalo_group_name") ||
@@ -235,9 +272,24 @@ function isMissingRoomCloseRequestsTableError(error: { message?: string; code?: 
   return (
     error.code === "42P01" ||
     error.code === "42703" ||
+    error.code === "42883" ||
+    error.code === "PGRST202" ||
     error.code === "PGRST204" ||
     error.code === "PGRST205" ||
+    message.includes("mark_room_close_request_seen") ||
     message.includes("room_close_requests") ||
+    message.includes("schema cache")
+  );
+}
+
+function isMissingRoomLayoutsColumnError(error: { message?: string; code?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+
+  return (
+    error.code === "42703" ||
+    error.code === "PGRST204" ||
+    error.code === "PGRST205" ||
+    message.includes("room_layouts") ||
     message.includes("schema cache")
   );
 }
@@ -246,8 +298,29 @@ function missingZaloMigrationMessage() {
   return "Database Supabase chưa có migration Zalo mới. Hãy chạy supabase/module_04_zalo_group_links.sql trong Supabase SQL Editor rồi lưu lại.";
 }
 
+function missingRoomLayoutsSchemaMessage() {
+  return "Chưa lưu được Dạng phòng. Vui lòng thử lại hoặc liên hệ quản trị.";
+}
+
 function missingRoomCloseRequestsMigrationMessage() {
   return "Chưa xử lý được yêu cầu báo chốt. Vui lòng thử lại hoặc báo quản trị viên kiểm tra cấu hình dữ liệu.";
+}
+
+function logRoomUpdateFailure(step: string, error: unknown, context?: Record<string, unknown>) {
+  console.error("[landlord.updateRoomAction]", step, {
+    ...(context ?? {}),
+    error
+  });
+}
+
+function logMissingRoomLayoutsColumn(error: unknown, context?: Record<string, unknown>) {
+  console.error(
+    "[landlord.updateRoomAction] Missing column rooms.room_layouts. Run migration supabase/module_16_room_layouts_key_contract.sql.",
+    {
+      ...(context ?? {}),
+      error
+    }
+  );
 }
 
 function getFeePayload(formData: FormData) {
@@ -266,10 +339,16 @@ function getFeePayload(formData: FormData) {
   };
 }
 
-function getRoomPayload(formData: FormData) {
+function getRoomPayload(
+  formData: FormData,
+  options?: {
+    fallbackWeaknesses?: string | null;
+  }
+) {
   const roomCode = getString(formData, "room_code");
   const status = getString(formData, "status");
   const feeMode = getString(formData, "fee_mode") || "building_default";
+  const roomLayouts = parseRoomLayoutsFromFormData(formData);
 
   if (!roomCode) {
     throw new Error("Vui lòng nhập mã phòng.");
@@ -283,7 +362,7 @@ function getRoomPayload(formData: FormData) {
     throw new Error("Cách dùng phí không hợp lệ.");
   }
 
-  return {
+  const payload = {
     area_m2: parseOptionalDecimal(formData, "area_m2"),
     available_from: nullableString(formData, "available_from"),
     commission: nullableString(formData, "commission"),
@@ -307,7 +386,14 @@ function getRoomPayload(formData: FormData) {
     status,
     strengths: nullableString(formData, "strengths"),
     title: nullableString(formData, "title"),
-    weaknesses: nullableString(formData, "weaknesses")
+    weaknesses: formData.has("weaknesses")
+      ? nullableString(formData, "weaknesses")
+      : options?.fallbackWeaknesses ?? null
+  };
+
+  return {
+    ...payload,
+    room_layouts: roomLayouts
   };
 }
 
@@ -318,24 +404,129 @@ function getRoomFeesPayload(formData: FormData, roomId: string) {
   };
 }
 
-function getRoomFeaturesPayload(formData: FormData, roomId: string) {
+function getRoomFeaturesPayload(formData: FormData, roomId: string, roomLayouts: string[] = []) {
+  const legacyLayoutFlags = getLegacyRoomLayoutFeatureFlags(roomLayouts);
+
   return {
     allows_pet: checkbox(formData, "allows_pet"),
     has_air_conditioner: checkbox(formData, "has_air_conditioner"),
-    has_balcony: checkbox(formData, "has_balcony"),
+    has_balcony: legacyLayoutFlags.has_balcony ?? false,
     has_bed: checkbox(formData, "has_bed"),
     has_elevator: checkbox(formData, "has_elevator"),
     has_fridge: checkbox(formData, "has_fridge"),
     has_parking: checkbox(formData, "has_parking"),
-    has_private_bathroom: checkbox(formData, "has_private_bathroom"),
-    has_private_kitchen: checkbox(formData, "has_private_kitchen"),
+    has_private_bathroom: legacyLayoutFlags.has_private_bathroom ?? false,
+    has_private_kitchen: legacyLayoutFlags.has_private_kitchen ?? false,
     has_security: checkbox(formData, "has_security"),
     has_wardrobe: checkbox(formData, "has_wardrobe"),
     has_washing_machine: checkbox(formData, "has_washing_machine"),
-    has_window: checkbox(formData, "has_window"),
+    has_window: legacyLayoutFlags.has_window ?? false,
     is_furnished: checkbox(formData, "is_furnished"),
     room_id: roomId
   };
+}
+
+type RoomFeaturesPayload = ReturnType<typeof getRoomFeaturesPayload>;
+type RoomFeatureBooleanKey = Exclude<keyof RoomFeaturesPayload, "room_id">;
+
+const ROOM_FEATURE_SELECT =
+  "room_id, allows_pet, has_air_conditioner, has_balcony, has_bed, has_elevator, has_fridge, has_parking, has_private_bathroom, has_private_kitchen, has_security, has_wardrobe, has_washing_machine, has_window, is_furnished";
+const ROOM_FEATURE_BOOLEAN_KEYS: RoomFeatureBooleanKey[] = [
+  "allows_pet",
+  "has_air_conditioner",
+  "has_balcony",
+  "has_bed",
+  "has_elevator",
+  "has_fridge",
+  "has_parking",
+  "has_private_bathroom",
+  "has_private_kitchen",
+  "has_security",
+  "has_wardrobe",
+  "has_washing_machine",
+  "has_window",
+  "is_furnished"
+];
+
+function mismatchedRoomFeatureKeys(payload: RoomFeaturesPayload, saved: RoomFeaturesPayload) {
+  return ROOM_FEATURE_BOOLEAN_KEYS.filter((key) => Boolean(saved[key]) !== payload[key]);
+}
+
+async function saveRoomFeatures(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  payload: RoomFeaturesPayload
+) {
+  const { room_id: roomId, ...featureFields } = payload;
+  const { data: existingRows, error: lookupError } = await supabase
+    .from("room_features")
+    .select("id")
+    .eq("room_id", roomId)
+    .returns<Array<{ id: string }>>();
+
+  if (lookupError) {
+    return { error: lookupError, step: "select existing room_features failed" };
+  }
+
+  if ((existingRows ?? []).length > 0) {
+    const { data, error: updateError } = await supabase
+      .from("room_features")
+      .update(featureFields)
+      .eq("room_id", roomId)
+      .select(ROOM_FEATURE_SELECT)
+      .returns<RoomFeaturesPayload[]>();
+
+    if (updateError) {
+      return { error: updateError, step: "update room_features failed" };
+    }
+
+    if (!data?.length) {
+      return {
+        error: new Error("Supabase returned no room_features rows after update."),
+        step: "update room_features returned no rows"
+      };
+    }
+
+    const mismatchedKeys = Array.from(
+      new Set(data.flatMap((row) => mismatchedRoomFeatureKeys(payload, row)))
+    );
+
+    if (mismatchedKeys.length > 0) {
+      return {
+        error: new Error(`Saved room_features mismatch: ${mismatchedKeys.join(", ")}`),
+        step: "verify room_features update failed"
+      };
+    }
+
+    return null;
+  }
+
+  const { data, error: insertError } = await supabase
+    .from("room_features")
+    .insert(payload)
+    .select(ROOM_FEATURE_SELECT)
+    .single<RoomFeaturesPayload>();
+
+  if (insertError) {
+    return { error: insertError, step: "insert room_features failed" };
+  }
+
+  if (!data?.room_id) {
+    return {
+      error: new Error("Supabase returned no room_features row after insert."),
+      step: "insert room_features returned no row"
+    };
+  }
+
+  const mismatchedKeys = mismatchedRoomFeatureKeys(payload, data);
+
+  if (mismatchedKeys.length > 0) {
+    return {
+      error: new Error(`Saved room_features mismatch: ${mismatchedKeys.join(", ")}`),
+      step: "verify room_features insert failed"
+    };
+  }
+
+  return null;
 }
 
 function imageLinks(formData: FormData) {
@@ -396,6 +587,61 @@ async function saveRoomImages(formData: FormData, roomId: string) {
       is_cover: index === 0 && links.length === 0,
       room_id: roomId,
       sort_order: links.length + index,
+      source_type: "uploaded",
+      storage_path: storagePath
+    });
+
+    if (imageError) {
+      throw new Error(imageError.message);
+    }
+  }
+}
+
+async function saveBuildingImages(formData: FormData, buildingId: string) {
+  const supabase = await createClient();
+  const uploads = formData
+    .getAll("uploaded_building_images")
+    .filter((value): value is File => value instanceof File && value.size > 0);
+
+  if (uploads.length === 0) {
+    return;
+  }
+
+  const { count, error: countError } = await supabase
+    .from("building_images")
+    .select("id", { count: "exact", head: true })
+    .eq("building_id", buildingId);
+
+  if (countError) {
+    throw new Error(countError.message);
+  }
+
+  const existingCount = count ?? 0;
+
+  for (const [index, file] of uploads.entries()) {
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const storagePath = `buildings/${buildingId}/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from("building-images")
+      .upload(storagePath, file, {
+        contentType: file.type || "image/jpeg",
+        upsert: false
+      });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    const { data: signed } = await supabase.storage
+      .from("building-images")
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+
+    const { error: imageError } = await supabase.from("building_images").insert({
+      building_id: buildingId,
+      image_type: "building",
+      image_url: signed?.signedUrl ?? storagePath,
+      is_cover: existingCount === 0 && index === 0,
+      sort_order: existingCount + index,
       source_type: "uploaded",
       storage_path: storagePath
     });
@@ -759,6 +1005,7 @@ export async function createBuildingAction(
     }
 
     const createdBuildingId = data.id;
+    await saveBuildingImages(formData, createdBuildingId);
     revalidateLandlordPaths(createdBuildingId);
     targetPath = `/landlord/buildings/${createdBuildingId}`;
   } catch (error) {
@@ -812,6 +1059,7 @@ export async function updateBuildingAction(
       return { error: error.message };
     }
 
+    await saveBuildingImages(formData, buildingId);
     revalidateLandlordPaths(buildingId);
     targetPath = `/landlord/buildings/${buildingId}`;
   } catch (error) {
@@ -823,6 +1071,21 @@ export async function updateBuildingAction(
   }
 
   redirect(targetPath);
+}
+
+export async function markRoomCloseRequestSeenAction(requestId: string): Promise<void> {
+  await requireRole(["landlord"]);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mark_room_close_request_seen", {
+    close_request_id: requestId
+  });
+
+  if (error && !isMissingRoomCloseRequestsTableError(error)) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/landlord");
+  revalidatePath("/landlord/sell-list");
 }
 
 export async function upsertBuildingFeesAction(
@@ -870,10 +1133,11 @@ export async function createRoomAction(
   try {
     const payload = getRoomPayload(formData);
     const supabase = await createClient();
+    const roomLayouts = "room_layouts" in payload && Array.isArray(payload.room_layouts) ? payload.room_layouts : [];
 
     await requireOwnedBuilding(buildingId, profile.id);
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("rooms")
       .insert({
         ...payload,
@@ -883,33 +1147,58 @@ export async function createRoomAction(
       .select("id")
       .single<{ id: string }>();
 
+    if (error && isMissingRoomLayoutsColumnError(error)) {
+      logMissingRoomLayoutsColumn(error, {
+        action: "createRoomAction",
+        buildingId,
+        landlordId: profile.id,
+        roomLayouts,
+        requiredMigration: "supabase/module_16_room_layouts_key_contract.sql"
+      });
+      return { error: missingRoomLayoutsSchemaMessage() };
+    }
+
     if (error) {
       return { error: error.message };
     }
 
-    const featurePayload = getRoomFeaturesPayload(formData, data.id);
-    const feePayload = getRoomFeesPayload(formData, data.id);
-    const actions = [supabase.from("room_features").insert(featurePayload)];
-
-    if (payload.fee_mode === "room_override") {
-      actions.push(supabase.from("room_fees").insert(feePayload));
-    } else {
-      actions.push(
-        supabase.from("building_fees").upsert(
-          {
-            ...getFeePayload(formData),
-            building_id: buildingId
-          },
-          { onConflict: "building_id" }
-        )
-      );
+    if (!data) {
+      return { error: "Không tạo được phòng." };
     }
 
-    const results = await Promise.all(actions);
-    const actionError = results.find((result) => result.error)?.error;
+    const featurePayload = getRoomFeaturesPayload(formData, data.id, roomLayouts);
+    const featuresSaveFailure = await saveRoomFeatures(supabase, featurePayload);
 
-    if (actionError) {
-      return { error: actionError.message };
+    if (featuresSaveFailure) {
+      logRoomUpdateFailure(featuresSaveFailure.step, featuresSaveFailure.error, {
+        action: "createRoomAction",
+        buildingId,
+        featurePayload,
+        landlordId: profile.id,
+        roomId: data.id
+      });
+      return { error: "Không lưu được tiện ích của phòng. Vui lòng thử lại." };
+    }
+
+    const feePayload = getRoomFeesPayload(formData, data.id);
+    let feeError: { message: string } | null = null;
+
+    if (payload.fee_mode === "room_override") {
+      const { error: roomFeeError } = await supabase.from("room_fees").insert(feePayload);
+      feeError = roomFeeError;
+    } else {
+      const { error: buildingFeeError } = await supabase.from("building_fees").upsert(
+        {
+          ...getFeePayload(formData),
+          building_id: buildingId
+        },
+        { onConflict: "building_id" }
+      );
+      feeError = buildingFeeError;
+    }
+
+    if (feeError) {
+      return { error: feeError.message };
     }
 
     await saveRoomImages(formData, data.id);
@@ -936,34 +1225,101 @@ export async function updateRoomAction(
   let targetPath = "";
 
   try {
-    const payload = getRoomPayload(formData);
     const supabase = await createClient();
     const ownedRoom = await requireOwnedRoom(roomId, profile.id);
+    const payload = getRoomPayload(formData, {
+      fallbackWeaknesses: ownedRoom.weaknesses
+    });
+    const roomLayouts = "room_layouts" in payload && Array.isArray(payload.room_layouts) ? payload.room_layouts : [];
 
-    const { error } = await supabase.from("rooms").update(payload).eq("id", roomId);
+    let {
+      data: updatedRoom,
+      error
+    } = await supabase
+      .from("rooms")
+      .update(payload)
+      .eq("id", roomId)
+      .eq("building_id", ownedRoom.building_id)
+      .select("id")
+      .maybeSingle<{ id: string }>();
 
-    if (error) {
-      return { error: error.message };
+    if (error && isMissingRoomLayoutsColumnError(error)) {
+      logMissingRoomLayoutsColumn(error, {
+        action: "updateRoomAction",
+        roomId,
+        buildingId: ownedRoom.building_id,
+        landlordId: profile.id,
+        roomLayouts,
+        updatePayloadHasRoomLayouts: "room_layouts" in payload,
+        requiredMigration: "supabase/module_16_room_layouts_key_contract.sql"
+      });
+      return { error: missingRoomLayoutsSchemaMessage() };
     }
 
-    const { error: featuresError } = await supabase
-      .from("room_features")
-      .upsert(getRoomFeaturesPayload(formData, roomId), { onConflict: "room_id" });
+    if (error) {
+      logRoomUpdateFailure("update rooms failed", error, {
+        roomId,
+        buildingId: ownedRoom.building_id,
+        landlordId: profile.id
+      });
+      return { error: "Không lưu được phòng. Vui lòng thử lại." };
+    }
 
-    if (featuresError) {
-      return { error: featuresError.message };
+    if (!updatedRoom) {
+      logRoomUpdateFailure("update rooms matched no rows", null, {
+        roomId,
+        buildingId: ownedRoom.building_id,
+        landlordId: profile.id
+      });
+      return { error: "Không lưu được phòng. Không tìm thấy phòng cần cập nhật." };
+    }
+
+    const featurePayload = getRoomFeaturesPayload(formData, roomId, roomLayouts);
+    const featuresSaveFailure = await saveRoomFeatures(supabase, featurePayload);
+
+    if (featuresSaveFailure) {
+      logRoomUpdateFailure(featuresSaveFailure.step, featuresSaveFailure.error, {
+        action: "updateRoomAction",
+        buildingId: ownedRoom.building_id,
+        featurePayload,
+        roomId,
+        landlordId: profile.id
+      });
+      return { error: "Không lưu được tiện ích của phòng. Vui lòng thử lại." };
     }
 
     if (payload.fee_mode === "room_override") {
-      const { error: feesError } = await supabase
+      const { data: savedFees, error: feesError } = await supabase
         .from("room_fees")
-        .upsert(getRoomFeesPayload(formData, roomId), { onConflict: "room_id" });
+        .upsert(getRoomFeesPayload(formData, roomId), { onConflict: "room_id" })
+        .select("room_id")
+        .maybeSingle<{ room_id: string }>();
 
       if (feesError) {
-        return { error: feesError.message };
+        logRoomUpdateFailure("upsert room_fees failed", feesError, {
+          roomId,
+          landlordId: profile.id
+        });
+        return { error: "Không lưu được bộ phí của phòng. Vui lòng thử lại." };
+      }
+
+      if (!savedFees) {
+        logRoomUpdateFailure("upsert room_fees returned no row", null, {
+          roomId,
+          landlordId: profile.id
+        });
+        return { error: "Không lưu được bộ phí của phòng. Vui lòng thử lại." };
       }
     } else {
-      await supabase.from("room_fees").delete().eq("room_id", roomId);
+      const { error: deleteFeesError } = await supabase.from("room_fees").delete().eq("room_id", roomId);
+
+      if (deleteFeesError) {
+        logRoomUpdateFailure("delete room_fees failed", deleteFeesError, {
+          roomId,
+          landlordId: profile.id
+        });
+        return { error: "Không cập nhật được chế độ phí của phòng. Vui lòng thử lại." };
+      }
     }
 
     await saveRoomImages(formData, roomId);
@@ -971,6 +1327,11 @@ export async function updateRoomAction(
     revalidateLandlordPaths(ownedRoom.building_id, roomId);
     targetPath = `/landlord/rooms/${roomId}?updated=1`;
   } catch (error) {
+    logRoomUpdateFailure("unexpected failure", error, {
+      roomId,
+      landlordId: profile.id
+    });
+
     if (error instanceof Error) {
       return { error: error.message };
     }
@@ -1233,6 +1594,7 @@ export async function duplicateRoomAction(
       rent_price: checkbox(formData, "copy_price") ? sourceRoom.rent_price : 0,
       room_code: roomCode,
       room_drive_folder_url: copyImages ? sourceRoom.room_drive_folder_url : null,
+      room_layouts: copyFeatures ? sourceRoom.room_layouts ?? [] : [],
       status: newStatus,
       strengths: copyDescription ? sourceRoom.strengths : null,
       title: sourceRoom.title,
@@ -1240,14 +1602,29 @@ export async function duplicateRoomAction(
       weaknesses: copyDescription ? sourceRoom.weaknesses : null
     }));
 
-    const { data: insertedRooms, error: insertError } = await supabase
+    let { data: insertedRooms, error: insertError } = await supabase
       .from("rooms")
       .insert(newRooms)
       .select("id, room_code")
       .returns<Array<{ id: string; room_code: string }>>();
 
+    if (insertError && isMissingRoomLayoutsColumnError(insertError)) {
+      logMissingRoomLayoutsColumn(insertError, {
+        action: "duplicateRoomAction",
+        sourceRoomId: roomId,
+        buildingId: sourceRoom.building_id,
+        landlordId: profile.id,
+        requiredMigration: "supabase/module_16_room_layouts_key_contract.sql"
+      });
+      return { error: missingRoomLayoutsSchemaMessage() };
+    }
+
     if (insertError) {
       return { error: insertError.message };
+    }
+
+    if (!insertedRooms) {
+      return { error: "Không nhân bản được phòng." };
     }
 
     const featureRows =

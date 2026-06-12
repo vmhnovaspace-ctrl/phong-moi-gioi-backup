@@ -1,24 +1,35 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BuildingZaloInlineEditor } from "@/components/landlord/building-zalo-group-panel";
 import { CloseRequestActionButtons } from "@/components/landlord/close-request-action-buttons";
 import { CloseRoomButton } from "@/components/landlord/close-room-button";
 import { StatusBadge } from "@/components/landlord/status-badge";
-import { ZaloShareButton } from "@/components/landlord/zalo-share-button";
-import { getSiteUrl } from "@/lib/env";
+import {
+  ZaloImageCardModal,
+  type BuildingZaloPayload,
+  type ZaloImageCardMode,
+  type ZaloRoom,
+} from "@/components/landlord/zalo-image-cards";
 import { formatArea, formatCurrencyVnd, formatDate, roomStatusLabels } from "@/lib/landlord/format";
 import type { SellListClosedRoom, SellListGroup } from "@/lib/landlord/types";
-import {
-  buildBuildingSellZaloText,
-  buildClosedRoomZaloText,
-  buildLandlordSellZaloText,
-  buildRoomPushZaloText
-} from "@/lib/share/templates";
+import { getSiteUrl } from "@/lib/site-url";
+
+const ALL_BUILDINGS_ZALO_ID = "__all_buildings__";
+
+type ZaloModalState =
+  | { mode: Extract<ZaloImageCardMode, "building-list">; buildingId: string }
+  | { mode: Extract<ZaloImageCardMode, "push-room">; roomId: string }
+  | { mode: Extract<ZaloImageCardMode, "closed-room">; roomId: string }
+  | null;
 
 type SellListViewProps = {
   groups: SellListGroup[];
   landlord: {
+    id: string;
     full_name: string;
-    public_slug: string;
+    public_slug?: string | null;
     landlord_zalo_group_url?: string | null;
     landlord_zalo_group_name?: string | null;
   };
@@ -32,23 +43,75 @@ export function SellListView({
   mode,
   recentlyClosed = []
 }: SellListViewProps) {
-  if (mode === "building") {
-    return <BuildingSellList groups={groups} landlord={landlord} />;
-  }
+  const [zaloModal, setZaloModal] = useState<ZaloModalState>(null);
+  const activeRooms = useMemo(() => groups.flatMap((group) => group.rooms), [groups]);
+  const modalRooms = useMemo(
+    () => [...activeRooms, ...dedupeRecentlyClosedRooms(recentlyClosed)],
+    [activeRooms, recentlyClosed]
+  );
+  const activeBuildingGroup =
+    zaloModal?.mode === "building-list"
+      ? groups.find((group) => group.building.id === zaloModal.buildingId)
+      : null;
+  const activeRoom =
+    zaloModal?.mode === "push-room" || zaloModal?.mode === "closed-room"
+      ? modalRooms.find((room) => room.id === zaloModal.roomId)
+      : null;
+  const landlordShareId = getLandlordShareId(landlord.public_slug, landlord.id);
+  const shareLink = getShareLink(landlordShareId);
+  const buildingPayload = getBuildingZaloPayload({
+    activeBuildingGroup,
+    groups,
+    landlordGroupUrl: landlord.landlord_zalo_group_url,
+    modalState: zaloModal,
+  });
+  const activeZaloRoom = activeRoom
+    ? toZaloRoom(activeRoom, activeRoom.building.name, activeRoom.building.district)
+    : null;
+  const content =
+    mode === "building" ? (
+      <BuildingSellList groups={groups} landlord={landlord} onOpenZaloModal={setZaloModal} />
+    ) : (
+      <AllSellList
+        groups={groups}
+        landlord={landlord}
+        onOpenZaloModal={setZaloModal}
+        recentlyClosed={recentlyClosed}
+      />
+    );
 
-  return <AllSellList groups={groups} landlord={landlord} recentlyClosed={recentlyClosed} />;
+  return (
+    <>
+      {content}
+      <ZaloImageCardModal
+        open={Boolean(zaloModal)}
+        mode={zaloModal?.mode ?? null}
+        buildingPayload={buildingPayload}
+        room={activeZaloRoom}
+        zaloGroupUrl={
+          buildingPayload?.zaloGroupUrl ??
+          activeRoom?.building.zalo_group_url ??
+          landlord.landlord_zalo_group_url ??
+          null
+        }
+        shareUrl={shareLink.url}
+        shareDisplayUrl={shareLink.displayUrl}
+        onClose={() => setZaloModal(null)}
+      />
+    </>
+  );
 }
 
 function BuildingSellList({
   groups,
-  landlord
+  landlord,
+  onOpenZaloModal
 }: {
   groups: SellListGroup[];
   landlord: SellListViewProps["landlord"];
+  onOpenZaloModal: (state: ZaloModalState) => void;
 }) {
   const group = groups[0] ?? null;
-  const baseUrl = getSiteUrl();
-
   if (!group || group.rooms.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-slate-300 bg-white p-6 text-center">
@@ -59,10 +122,6 @@ function BuildingSellList({
       </div>
     );
   }
-
-  const buildingText = buildBuildingSellZaloText(group.building, group.rooms, baseUrl);
-  const zaloUrl = group.building.zalo_group_url ?? landlord.landlord_zalo_group_url;
-  const shareLabel = group.building.zalo_group_url ? "Gửi Zalo căn này" : "Gửi bằng nhóm tổng";
 
   return (
     <div className="space-y-4">
@@ -81,15 +140,13 @@ function BuildingSellList({
               </p>
             ) : null}
           </div>
-          <ZaloShareButton
-            buildingId={group.building.id}
-            eventType="share_building"
-            label={shareLabel}
-            noZaloMessage="Đã copy nội dung. Chưa có link nhóm Zalo, bạn có thể dán thủ công vào Zalo."
-            text={buildingText}
-            variant="primary"
-            zaloUrl={zaloUrl}
-          />
+          <button
+            className="inline-flex h-10 items-center justify-center rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
+            onClick={() => onOpenZaloModal({ mode: "building-list", buildingId: group.building.id })}
+            type="button"
+          >
+            {group.building.zalo_group_url ? "Gửi Zalo căn này" : "Gửi bằng nhóm tổng"}
+          </button>
         </div>
       </section>
 
@@ -108,15 +165,13 @@ function BuildingSellList({
                 >
                   Sửa
                 </Link>
-                <ZaloShareButton
-                  buildingId={group.building.id}
-                  eventType="share_room"
-                  label="Đẩy phòng này"
-                  noZaloMessage="Đã copy nội dung. Chưa có link nhóm Zalo, bạn có thể dán thủ công vào Zalo."
-                  roomId={room.id}
-                  text={buildRoomPushZaloText({ building: room.building, room }, baseUrl)}
-                  zaloUrl={zaloUrl}
-                />
+                <button
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-[#BFDBFE] bg-white px-3 text-sm font-semibold text-[#0F5FD7] hover:bg-[#EFF6FF]"
+                  onClick={() => onOpenZaloModal({ mode: "push-room", roomId: room.id })}
+                  type="button"
+                >
+                  Đẩy phòng này
+                </button>
                 {room.pending_close_request ? (
                   <CloseRequestActionButtons requestId={room.pending_close_request.id} />
                 ) : null}
@@ -132,15 +187,16 @@ function BuildingSellList({
 function AllSellList({
   groups,
   landlord,
+  onOpenZaloModal,
   recentlyClosed
 }: {
   groups: SellListGroup[];
   landlord: SellListViewProps["landlord"];
+  onOpenZaloModal: (state: ZaloModalState) => void;
   recentlyClosed: SellListClosedRoom[];
 }) {
-  const baseUrl = getSiteUrl();
   const activeRooms = groups.flatMap((group) => group.rooms);
-  const landlordText = buildLandlordSellZaloText({ groups, landlord }, baseUrl);
+  const closedRooms = dedupeRecentlyClosedRooms(recentlyClosed);
   const hasLandlordGroup = Boolean(landlord.landlord_zalo_group_url);
 
   return (
@@ -165,14 +221,13 @@ function AllSellList({
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <ZaloShareButton
-              eventType="share_landlord"
-              label={hasLandlordGroup ? "Gửi Zalo nhóm tổng" : "Copy tin tổng"}
-              noZaloMessage="Đã copy nội dung. Bạn chưa lưu link nhóm Zalo tổng, hãy dán thủ công vào Zalo hoặc thêm link nhóm tổng."
-              text={landlordText}
-              variant="primary"
-              zaloUrl={landlord.landlord_zalo_group_url}
-            />
+            <button
+              className="inline-flex h-10 items-center justify-center rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
+              onClick={() => onOpenZaloModal({ mode: "building-list", buildingId: ALL_BUILDINGS_ZALO_ID })}
+              type="button"
+            >
+              Gửi Zalo nhóm tổng
+            </button>
             {!hasLandlordGroup ? (
               <Link
                 className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
@@ -199,7 +254,7 @@ function AllSellList({
                 group={group}
                 hasLandlordGroup={hasLandlordGroup}
                 key={group.building.id}
-                landlordGroupUrl={landlord.landlord_zalo_group_url}
+                onOpenZaloModal={onOpenZaloModal}
               />
             ))}
           </div>
@@ -254,10 +309,10 @@ function AllSellList({
             Phòng vừa chuyển sang đã thuê trong 24 giờ gần nhất sẽ tự ẩn sau 24 giờ.
           </p>
         </div>
-        {recentlyClosed.length > 0 ? (
+        {closedRooms.length > 0 ? (
           <div className="grid gap-3">
-            {recentlyClosed.map((room) => (
-              <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={room.id}>
+            {closedRooms.map((room, index) => (
+              <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={closedRoomKey(room, index)}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase text-slate-500">
@@ -269,15 +324,13 @@ function AllSellList({
                       {!room.closed_from_log ? " · fallback theo thời gian cập nhật phòng" : ""}
                     </p>
                   </div>
-                  <ZaloShareButton
-                    buildingId={room.building.id}
-                    eventType="closed_announcement"
-                    label="Thông báo Zalo"
-                    noZaloMessage="Đã copy nội dung. Chưa có link nhóm Zalo căn hoặc nhóm tổng, bạn có thể dán thủ công vào Zalo."
-                    roomId={room.id}
-                    text={buildClosedRoomZaloText({ building: room.building, room }, baseUrl)}
-                    zaloUrl={room.building.zalo_group_url ?? landlord.landlord_zalo_group_url}
-                  />
+                  <button
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-[#BFDBFE] bg-white px-3 text-sm font-semibold text-[#0F5FD7] hover:bg-[#EFF6FF]"
+                    onClick={() => onOpenZaloModal({ mode: "closed-room", roomId: room.id })}
+                    type="button"
+                  >
+                    Thông báo Zalo
+                  </button>
                 </div>
               </article>
             ))}
@@ -293,22 +346,14 @@ function AllSellList({
 function BuildingShareCard({
   group,
   hasLandlordGroup,
-  landlordGroupUrl
+  onOpenZaloModal
 }: {
   group: SellListGroup;
   hasLandlordGroup: boolean;
-  landlordGroupUrl?: string | null;
+  onOpenZaloModal: (state: ZaloModalState) => void;
 }) {
-  const baseUrl = getSiteUrl();
   const hasBuildingGroup = Boolean(group.building.zalo_group_url);
-  const zaloUrl = group.building.zalo_group_url ?? landlordGroupUrl;
-  const text = buildBuildingSellZaloText(group.building, group.rooms, baseUrl);
   const status = getBuildingZaloStatus(hasBuildingGroup, hasLandlordGroup);
-  const mainLabel = hasBuildingGroup
-    ? "Gửi Zalo căn này"
-    : hasLandlordGroup
-      ? "Gửi bằng nhóm tổng"
-      : "Copy tin căn";
 
   return (
     <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
@@ -320,15 +365,17 @@ function BuildingShareCard({
           <p className={`mt-1 text-sm font-medium ${status.className}`}>{status.text}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ZaloShareButton
-            buildingId={group.building.id}
-            eventType="share_building"
-            label={mainLabel}
-            noZaloMessage="Đã copy tin căn. Chưa có link Zalo, bạn có thể dán thủ công."
-            text={text}
-            variant={hasBuildingGroup || hasLandlordGroup ? "primary" : "secondary"}
-            zaloUrl={zaloUrl}
-          />
+          <button
+            className={
+              hasBuildingGroup || hasLandlordGroup
+                ? "inline-flex h-10 items-center justify-center rounded-md bg-[#0F5FD7] px-3 text-sm font-semibold text-white hover:bg-[#0B4FB5]"
+                : "inline-flex h-10 items-center justify-center rounded-md border border-[#BFDBFE] bg-white px-3 text-sm font-semibold text-[#0F5FD7] hover:bg-[#EFF6FF]"
+            }
+            onClick={() => onOpenZaloModal({ mode: "building-list", buildingId: group.building.id })}
+            type="button"
+          >
+            {hasBuildingGroup ? "Gửi Zalo căn này" : hasLandlordGroup ? "Gửi bằng nhóm tổng" : "Gửi Zalo căn này"}
+          </button>
           <BuildingZaloInlineEditor
             buildingId={group.building.id}
             groupName={group.building.zalo_group_name}
@@ -420,6 +467,145 @@ function getBuildingZaloStatus(hasBuildingGroup: boolean, hasLandlordGroup: bool
     className: "text-red-700",
     text: "Chưa có link Zalo"
   };
+}
+
+function getBuildingZaloPayload({
+  activeBuildingGroup,
+  groups,
+  landlordGroupUrl,
+  modalState,
+}: {
+  activeBuildingGroup: SellListGroup | null | undefined;
+  groups: SellListGroup[];
+  landlordGroupUrl?: string | null;
+  modalState: ZaloModalState;
+}): BuildingZaloPayload | null {
+  if (modalState?.mode !== "building-list") {
+    return null;
+  }
+
+  if (modalState.buildingId === ALL_BUILDINGS_ZALO_ID) {
+    return {
+      buildingName: "Tất cả căn đang sell",
+      district: null,
+      zaloGroupUrl: landlordGroupUrl ?? null,
+      rooms: groups.flatMap((group) =>
+        group.rooms.map((room) => toZaloRoom(room, group.building.name, group.building.district))
+      ),
+    };
+  }
+
+  if (!activeBuildingGroup) {
+    return null;
+  }
+
+  return {
+    buildingName: activeBuildingGroup.building.name,
+    district: activeBuildingGroup.building.district,
+    zaloGroupUrl: activeBuildingGroup.building.zalo_group_url ?? landlordGroupUrl ?? null,
+    rooms: activeBuildingGroup.rooms.map((room) =>
+      toZaloRoom(room, activeBuildingGroup.building.name, activeBuildingGroup.building.district)
+    ),
+  };
+}
+
+function toZaloRoom(
+  room: SellListGroup["rooms"][number] | SellListClosedRoom,
+  buildingName: string,
+  district?: string | null
+): ZaloRoom {
+  return {
+    id: room.id,
+    roomCode: room.room_code || room.title || "Chưa rõ",
+    rentPrice: toNullableNumber(room.rent_price),
+    depositAmount: toNullableNumber(room.deposit_amount),
+    status: room.status,
+    isNewVacant: isFreshWithin24Hours(room.updated_at) || isFreshWithin24Hours(room.created_at),
+    district: district ?? null,
+    buildingName,
+    areaM2: toNullableNumber(room.area_m2),
+    highlights: parseHighlights(room.strengths),
+  };
+}
+
+function getLandlordShareId(landlordSlug?: string | null, landlordId?: string | null) {
+  const slug = landlordSlug?.trim();
+
+  if (slug) {
+    return slug;
+  }
+
+  const id = landlordId?.trim();
+  return id ? `u-${id.replaceAll("-", "")}` : "";
+}
+
+function getShareLink(shareId?: string) {
+  const origin = getCurrentPublicOrigin();
+  const path = shareId ? `/s/rooms/${encodeURIComponent(shareId)}` : "/s/rooms";
+  const url = `${origin}${path}`;
+
+  return {
+    url,
+    displayUrl: url.replace(/^https?:\/\//, ""),
+  };
+}
+
+function getCurrentPublicOrigin() {
+  return getSiteUrl();
+}
+
+function toNullableNumber(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numberValue = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function parseHighlights(value: string | null | undefined) {
+  if (!value?.trim()) {
+    return undefined;
+  }
+
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isFreshWithin24Hours(value: string | null | undefined) {
+  if (!value) {
+    return false;
+  }
+
+  const time = new Date(value).getTime();
+
+  if (!Number.isFinite(time)) {
+    return false;
+  }
+
+  return Date.now() - time <= 24 * 60 * 60 * 1000;
+}
+
+function dedupeRecentlyClosedRooms(rooms: SellListClosedRoom[]) {
+  const newestByRoom = new Map<string, SellListClosedRoom>();
+
+  for (const room of rooms) {
+    const current = newestByRoom.get(room.id);
+
+    if (!current || new Date(room.closed_at).getTime() > new Date(current.closed_at).getTime()) {
+      newestByRoom.set(room.id, room);
+    }
+  }
+
+  return [...newestByRoom.values()].sort(
+    (left, right) => new Date(right.closed_at).getTime() - new Date(left.closed_at).getTime()
+  );
+}
+
+function closedRoomKey(room: SellListClosedRoom, index: number) {
+  return room.status_log_id ?? `${room.id}-${room.closed_at ?? room.updated_at ?? index}`;
 }
 
 function formatDateTime(value: string) {

@@ -13,7 +13,8 @@ export default async function LandlordLayout({
       description="Quản lý theo cấu trúc Chủ nhà -> Căn nhà -> Phòng."
       navItems={[
         { href: "/landlord", label: "Căn nhà" },
-        { href: "/landlord/sell-list", label: "Danh sách phòng sell" }
+        { href: "/landlord/sell-list", label: "Danh sách phòng sell" },
+        { href: "/landlord/guide", label: "Hướng dẫn" }
       ]}
       profile={profile}
       title="Dashboard chủ nhà"

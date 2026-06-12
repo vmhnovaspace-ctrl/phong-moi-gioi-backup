@@ -1,3 +1,5 @@
+import { getSiteUrl as getResolvedSiteUrl } from "@/lib/site-url";
+
 export function getSupabaseUrl() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
@@ -23,5 +25,5 @@ export function getSupabasePublishableKey() {
 }
 
 export function getSiteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  return getResolvedSiteUrl();
 }
