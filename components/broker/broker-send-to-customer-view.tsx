@@ -32,8 +32,8 @@ import {
   buildTenantSafeLocation,
   mapRoomFeaturesToVietnamese
 } from "@/lib/broker/post-templates";
+import { buildClientAbsoluteUrl, rebaseInternalUrlsToBrowserOrigin } from "@/lib/client-public-url";
 import { formatArea, formatCurrencyVnd } from "@/lib/landlord/format";
-import { buildAbsoluteUrl } from "@/lib/site-url";
 import { getHcmcDistricts, getHcmcWards } from "@/lib/vietnam-hcmc-locations";
 import { CURRENT_ADMIN_UNIT_OPTIONS } from "@/src/lib/location-options";
 import { matchesLocationFilter } from "@/src/lib/location-utils";
@@ -162,7 +162,7 @@ export function BrokerSendToCustomerView({
   }
 
   async function copyText(text: string, message = "Đã copy.") {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(rebaseInternalUrlsToBrowserOrigin(text));
     setToast(message);
     window.setTimeout(() => setToast(null), 1600);
   }
@@ -1184,7 +1184,7 @@ function buildZaloUrl(customerPhone: string | null, customerZaloLink: string | n
 }
 
 function getClientPackageUrl(publicSlug: string) {
-  return buildAbsoluteUrl(`/p/${publicSlug}`);
+  return buildClientAbsoluteUrl(`/p/${publicSlug}`);
 }
 
 function normalizePackageResult(result: CreatedPackageResult): CreatedPackageResult {

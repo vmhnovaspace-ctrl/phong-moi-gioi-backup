@@ -3,7 +3,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { Check, Copy } from "lucide-react";
-import { buildAbsoluteUrl } from "@/lib/site-url";
+import { buildClientAbsoluteUrl } from "@/lib/client-public-url";
 
 type CopyLinkButtonProps = {
   label?: string;
@@ -23,7 +23,7 @@ export function CopyLinkButton({
   const [copied, setCopied] = useState(false);
 
   async function copyLink() {
-    const value = url ?? (path ? buildAbsoluteUrl(path) : window.location.href);
+    const value = url ?? (path ? buildClientAbsoluteUrl(path) : window.location.href);
 
     try {
       await navigator.clipboard.writeText(value);

@@ -12,6 +12,7 @@ import {
   type ZaloImageCardMode,
   type ZaloRoom,
 } from "@/components/landlord/zalo-image-cards";
+import { getBrowserOrigin } from "@/lib/client-public-url";
 import { formatArea, formatCurrencyVnd, formatDate, roomStatusLabels } from "@/lib/landlord/format";
 import type { SellListClosedRoom, SellListGroup } from "@/lib/landlord/types";
 import { getSiteUrl } from "@/lib/site-url";
@@ -551,7 +552,7 @@ function getShareLink(shareId?: string) {
 }
 
 function getCurrentPublicOrigin() {
-  return getSiteUrl();
+  return getBrowserOrigin() ?? getSiteUrl();
 }
 
 function toNullableNumber(value: number | string | null | undefined) {

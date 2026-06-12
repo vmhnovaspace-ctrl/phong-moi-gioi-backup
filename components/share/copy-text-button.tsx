@@ -3,6 +3,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { Check, Copy, XCircle } from "lucide-react";
+import { rebaseInternalUrlsToBrowserOrigin } from "@/lib/client-public-url";
 
 type CopyTextButtonProps = {
   text: string;
@@ -24,7 +25,7 @@ export function CopyTextButton({
   const [state, setState] = useState<CopyState>("idle");
 
   async function copyText() {
-    const ok = await writeClipboard(text);
+    const ok = await writeClipboard(rebaseInternalUrlsToBrowserOrigin(text));
     setState(ok ? "copied" : "error");
     window.setTimeout(() => setState("idle"), 1800);
   }

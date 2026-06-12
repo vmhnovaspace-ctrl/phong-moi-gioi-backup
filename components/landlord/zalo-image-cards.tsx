@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toPng } from "html-to-image";
+import { rebaseInternalUrlsToBrowserOrigin } from "@/lib/client-public-url";
 
 const BROKER_LINK_LABEL = "Xem thông tin chi tiết phòng trống";
 
@@ -549,13 +550,15 @@ function buildZaloLinkText(url: string) {
 }
 
 async function copyTextToClipboard(text: string) {
+  const resolvedText = rebaseInternalUrlsToBrowserOrigin(text);
+
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(resolvedText);
     return;
   }
 
   const textarea = document.createElement("textarea");
-  textarea.value = text;
+  textarea.value = resolvedText;
   textarea.setAttribute("readonly", "true");
   textarea.style.position = "fixed";
   textarea.style.left = "-9999px";
